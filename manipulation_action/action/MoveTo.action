@@ -6,3 +6,4 @@ string goal_pose
 bool success
 ---
 # Feedback
+string msg

@@ -1,6 +1,5 @@
 #include "manipulation/MoveToActionServer.hpp"
 
-
 namespace manipulation
 {
 

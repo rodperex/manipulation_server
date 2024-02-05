@@ -1,20 +1,24 @@
 cmake_minimum_required(VERSION 3.5)
 project(action_server)
 
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
+set(CMAKE_CONFIG_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CONFIG_PATH}")
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(moveit_task_constructor_core REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
+find_package(moveit_task_constructor_core REQUIRED)
 find_package(manipulation_action REQUIRED)
+
 
 set(dependencies
     rclcpp
+    rclcpp_action
+    ament_index_cpp
+    moveit_task_constructor_core
     manipulation_action
-    moveit_task_constructor_core 
 )
 
 include_directories(
@@ -30,11 +34,25 @@ ament_target_dependencies(server
   ${dependencies}
 )
 
+add_executable(client
+  src/main_cli.cpp
+  src/manipulation/MoveToActionClient.cpp
+)
+ament_target_dependencies(client
+  ${dependencies}
+)
+
 install(TARGETS
   server
+  # client
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+install(DIRECTORY
+  params
+  launch
+  DESTINATION share/${PROJECT_NAME}
 )
 
 install(DIRECTORY include/
@@ -53,4 +71,7 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+ament_export_include_directories(include)
+ament_export_dependencies(${dependencies})
+ament_export_libraries(${PROJECT_NAME})
 ament_package()

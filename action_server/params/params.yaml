@@ -1,0 +1,4 @@
+  moveto_action_client:
+    ros__parameters:
+      group_name: "hand"
+      goal_pose: "open"
