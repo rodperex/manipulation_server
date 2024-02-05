@@ -54,6 +54,7 @@ MoveToActionServer::handle_accepted(
 void
 MoveToActionServer::move_robot_arm(const std::shared_ptr<GoalHandleMove> goal_handle)
 {
+  RCLCPP_INFO(this->get_logger(), "Executing goal");
   // auto feedback = std::make_shared<MoveTo::Feedback>();
   auto result = std::make_shared<MoveTo::Result>();
 
@@ -61,6 +62,8 @@ MoveToActionServer::move_robot_arm(const std::shared_ptr<GoalHandleMove> goal_ha
   options.automatically_declare_parameters_from_overrides(true);
 
   auto mtc_node = std::make_shared<MTCNode>(options, group_, goal_);
+  RCLCPP_INFO(this->get_logger(), "MTCNode node created with (%s-%s)",
+    group_.c_str(), goal_.c_str());
   rclcpp::executors::MultiThreadedExecutor executor;
   
   auto spin_thread = std::make_unique<std::thread>([&executor, &mtc_node]() {
@@ -69,6 +72,8 @@ MoveToActionServer::move_robot_arm(const std::shared_ptr<GoalHandleMove> goal_ha
     executor.remove_node(mtc_node->get_node_base_interface());
   });
 
+
+  RCLCPP_INFO(this->get_logger(), "MTCNode added to executor and spinning...");
   mtc_node->do_task();
 
   spin_thread->join();

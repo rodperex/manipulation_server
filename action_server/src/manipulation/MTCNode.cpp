@@ -8,7 +8,7 @@ MTCNode::MTCNode(const rclcpp::NodeOptions& options, std::string group, std::str
   : group_(group),
     goal_(goal) 
 {
-  node_ = std::make_shared<rclcpp::Node>("moveit::task_constructor_node", options);
+  node_ = std::make_shared<rclcpp::Node>("moveit_task_constructor_node", options);
 }
 
 rclcpp::node_interfaces::NodeBaseInterface::SharedPtr
