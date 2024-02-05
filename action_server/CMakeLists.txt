@@ -44,7 +44,7 @@ ament_target_dependencies(client
 
 install(TARGETS
   server
-  # client
+  client
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}

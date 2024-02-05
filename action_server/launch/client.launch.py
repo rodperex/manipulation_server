@@ -10,17 +10,16 @@ import yaml
 
 def generate_launch_description():
 
-    pkg_dir = get_package_share_directory('moveto_action_control')
+    pkg_dir = get_package_share_directory('action_server')
 
     params_file = os.path.join(pkg_dir, 'params', 'params.yaml')
-    print('file: ', params_file)
     with open(params_file, 'r') as f:
-        params = yaml.safe_load(f)['moveto_action_client']['ros__parameters']
-    
+        params = yaml.safe_load(f)['action_server']['ros__parameters']
+
     ld = LaunchDescription()
 
     robot_cmd = Node(
-        package='moveto_action_control',
+        package='action_server',
         executable='client',
         output='screen',
         parameters=[{

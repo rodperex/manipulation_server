@@ -7,7 +7,7 @@ MoveToActionClient::MoveToActionClient()
 : Node("moveto_action_client")
 {
   this->action_client_ = rclcpp_action::create_client<MoveTo>(
-      this, "move_robot_arm_client");
+      this, "move_robot_arm");
   
   auto goal_msg = manipulation_action::action::MoveTo_Goal();
 
@@ -16,6 +16,9 @@ MoveToActionClient::MoveToActionClient()
 
   get_parameter("group_name", goal_msg.group_name);
   get_parameter("goal_pose", goal_msg.goal_pose);
+
+  RCLCPP_INFO(get_logger(), "Sending goal to move robot arm (%s) to pose %s",
+    goal_msg.group_name.c_str(),goal_msg.goal_pose.c_str());
 
   send_goal(goal_msg);
 }

@@ -14,6 +14,8 @@ MoveToActionServer::MoveToActionServer()
     std::bind(&MoveToActionServer::handle_accepted, this, std::placeholders::_1)
   );
 
+  RCLCPP_INFO(this->get_logger(), "Ready to receive goals");
+
 }
 
 rclcpp_action::GoalResponse
