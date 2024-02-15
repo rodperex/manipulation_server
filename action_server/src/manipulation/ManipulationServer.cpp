@@ -121,12 +121,16 @@ ManipulationServer::execute_move_to_predefined(const std::shared_ptr<GoalHandleM
 
   task_.add(std::move(stage_state_current_));
 
+  RCLCPP_INFO(this->get_logger(), "Setting group: %s", goal->group_name.c_str());
+  RCLCPP_INFO(this->get_logger(), "Setting goal: %s", goal->goal_pose.c_str());
+
   auto stage_predefined_position =
       std::make_unique<moveit::task_constructor::stages::MoveTo>("stage_predefined_position", interpolation_planner_);
   stage_predefined_position->setGroup(goal->group_name);
-  stage_predefined_position->setGoal(goal->group_name);
-  stage_predefined_position->setTimeout(8.0);
+  stage_predefined_position->setGoal(goal->goal_pose);
+  
   task_.add(std::move(stage_predefined_position));
+
   RCLCPP_INFO(this->get_logger(), "Before init goal");
   try
   {
@@ -164,22 +168,6 @@ ManipulationServer::execute_move_to_predefined(const std::shared_ptr<GoalHandleM
     RCLCPP_ERROR_STREAM(get_logger(), "No solutions found");
     result->success = false;
   }
-  // auto mtc_node = std::make_shared<MTCNode>(options, group_, goal_);
-  // RCLCPP_INFO(this->get_logger(), "MTCNode node created with (%s-%s)",
-  //   group_.c_str(), goal_.c_str());
-  // rclcpp::executors::MultiThreadedExecutor executor;
-  
-  // auto spin_thread = std::make_unique<std::thread>([&executor, &mtc_node]() {
-  //   executor.add_node(mtc_node->get_node_base_interface());
-  //   executor.spin();
-  //   executor.remove_node(mtc_node->get_node_base_interface());
-  // });
-
-
-  // RCLCPP_INFO(this->get_logger(), "MTCNode added to executor and spinning...");
-  // mtc_node->do_task();
-
-  // spin_thread->join();
   
   
   RCLCPP_INFO(this->get_logger(), "Goal succeeded");
