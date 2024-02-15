@@ -14,19 +14,20 @@ namespace manipulation
 class MoveToPredefinedActionClient : public rclcpp::Node
 {
 public:
-    using MoveToPredefined = manipulation_interfaces::action::MoveToPredefined;
-    using GoalHandleMoveToPredefined = rclcpp_action::ClientGoalHandle<MoveToPredefined>;
+  using MoveToPredefined = manipulation_interfaces::action::MoveToPredefined;
+  using GoalHandleMoveToPredefined = rclcpp_action::ClientGoalHandle<MoveToPredefined>;
 
-    MoveToPredefinedActionClient();
+  MoveToPredefinedActionClient();
 
 private:
-    void send_goal(const MoveToPredefined::Goal& goal_msg);
-    void goal_response_callback(const GoalHandleMoveToPredefined::SharedPtr & goal_handle);
-    void feedback_callback(GoalHandleMoveToPredefined::SharedPtr,
-        const std::shared_ptr<const MoveToPredefined::Feedback> feedback);
-    void result_callback(const GoalHandleMoveToPredefined::WrappedResult & result);
-    
-    rclcpp_action::Client<MoveToPredefined>::SharedPtr action_client_;
+  void send_goal(const MoveToPredefined::Goal & goal_msg);
+  void goal_response_callback(const GoalHandleMoveToPredefined::SharedPtr & goal_handle);
+  void feedback_callback(
+    GoalHandleMoveToPredefined::SharedPtr,
+    const std::shared_ptr<const MoveToPredefined::Feedback> feedback);
+  void result_callback(const GoalHandleMoveToPredefined::WrappedResult & result);
+
+  rclcpp_action::Client<MoveToPredefined>::SharedPtr action_client_;
 };
 
 } // end namespace manipulation
