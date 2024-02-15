@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "manipulation_action/action/move_to.hpp"
+#include "manipulation_interfaces/action/move_to_predefined.hpp"
 #include <rclcpp/rclcpp.hpp>
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "rclcpp/executor.hpp"
@@ -11,22 +11,22 @@
 namespace manipulation
 {
 
-class MoveToActionClient : public rclcpp::Node
+class MoveToPredefinedActionClient : public rclcpp::Node
 {
 public:
-    using MoveTo = manipulation_action::action::MoveTo;
-    using GoalHandleMoveTo = rclcpp_action::ClientGoalHandle<MoveTo>;
+    using MoveToPredefined = manipulation_interfaces::action::MoveToPredefined;
+    using GoalHandleMoveToPredefined = rclcpp_action::ClientGoalHandle<MoveToPredefined>;
 
-    MoveToActionClient();
+    MoveToPredefinedActionClient();
 
 private:
-    void send_goal(const MoveTo::Goal& goal_msg);
-    void goal_response_callback(const GoalHandleMoveTo::SharedPtr & goal_handle);
-    void feedback_callback(GoalHandleMoveTo::SharedPtr,
-        const std::shared_ptr<const MoveTo::Feedback> feedback);
-    void result_callback(const GoalHandleMoveTo::WrappedResult & result);
+    void send_goal(const MoveToPredefined::Goal& goal_msg);
+    void goal_response_callback(const GoalHandleMoveToPredefined::SharedPtr & goal_handle);
+    void feedback_callback(GoalHandleMoveToPredefined::SharedPtr,
+        const std::shared_ptr<const MoveToPredefined::Feedback> feedback);
+    void result_callback(const GoalHandleMoveToPredefined::WrappedResult & result);
     
-    rclcpp_action::Client<MoveTo>::SharedPtr action_client_;
+    rclcpp_action::Client<MoveToPredefined>::SharedPtr action_client_;
 };
 
 } // end namespace manipulation

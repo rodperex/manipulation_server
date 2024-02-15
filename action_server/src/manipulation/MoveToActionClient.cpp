@@ -3,13 +3,13 @@
 namespace manipulation
 {
 
-MoveToActionClient::MoveToActionClient()
+MoveToPredefinedActionClient::MoveToPredefinedActionClient()
 : Node("moveto_action_client")
 {
-  this->action_client_ = rclcpp_action::create_client<MoveTo>(
-      this, "move_robot_arm");
+  this->action_client_ = rclcpp_action::create_client<MoveToPredefined>(
+      this, "move_robot_to_predefined");
   
-  auto goal_msg = manipulation_action::action::MoveTo_Goal();
+  auto goal_msg = manipulation_interfaces::action::MoveToPredefined_Goal();
 
   declare_parameter("group_name", "hand");
   declare_parameter("goal_pose", "open");
@@ -24,7 +24,7 @@ MoveToActionClient::MoveToActionClient()
 }
 
 void
-MoveToActionClient::send_goal(const MoveTo::Goal& goal_msg)
+MoveToPredefinedActionClient::send_goal(const MoveToPredefined::Goal& goal_msg)
 {
   
   if (!action_client_->wait_for_action_server(std::chrono::seconds(10))) {
@@ -33,23 +33,23 @@ MoveToActionClient::send_goal(const MoveTo::Goal& goal_msg)
 
   RCLCPP_INFO(get_logger(), "Sending goal");
   
-  auto send_goal_options = rclcpp_action::Client<MoveTo>::SendGoalOptions();
+  auto send_goal_options = rclcpp_action::Client<MoveToPredefined>::SendGoalOptions();
 
   send_goal_options.goal_response_callback =
-    std::bind(&MoveToActionClient::goal_response_callback, this,
+    std::bind(&MoveToPredefinedActionClient::goal_response_callback, this,
     std::placeholders::_1);
   send_goal_options.feedback_callback =
-    std::bind(&MoveToActionClient::feedback_callback, this,
+    std::bind(&MoveToPredefinedActionClient::feedback_callback, this,
     std::placeholders::_1, std::placeholders::_2);
   send_goal_options.result_callback =
-    std::bind(&MoveToActionClient::result_callback, this,
+    std::bind(&MoveToPredefinedActionClient::result_callback, this,
     std::placeholders::_1);
 
   action_client_->async_send_goal(goal_msg, send_goal_options);
 
 }
 void
-MoveToActionClient::goal_response_callback(const GoalHandleMoveTo::SharedPtr & goal_handle)
+MoveToPredefinedActionClient::goal_response_callback(const GoalHandleMoveToPredefined::SharedPtr & goal_handle)
 {
   if (!goal_handle) {
     RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server");
@@ -59,14 +59,14 @@ MoveToActionClient::goal_response_callback(const GoalHandleMoveTo::SharedPtr & g
 }
 
 void
-MoveToActionClient::feedback_callback(GoalHandleMoveTo::SharedPtr,
-  const std::shared_ptr<const MoveTo::Feedback> feedback)
+MoveToPredefinedActionClient::feedback_callback(GoalHandleMoveToPredefined::SharedPtr,
+  const std::shared_ptr<const MoveToPredefined::Feedback> feedback)
 {
   RCLCPP_INFO(this->get_logger(), "Feedback: %s", feedback->msg.c_str());
 }
 
 void
-MoveToActionClient::result_callback(const GoalHandleMoveTo::WrappedResult & result)
+MoveToPredefinedActionClient::result_callback(const GoalHandleMoveToPredefined::WrappedResult & result)
 {
   RCLCPP_INFO(this->get_logger(), "Action finished");
 }
