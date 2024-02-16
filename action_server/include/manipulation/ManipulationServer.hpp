@@ -13,7 +13,7 @@
 #include <moveit/task_constructor/solvers.h>
 #include <moveit/task_constructor/stages.h>
 
-// #include "manipulation/MTCNode.hpp"
+#include "manipulation/MTCNode.hpp"
 
 
 namespace manipulation
@@ -64,7 +64,7 @@ private:
 
   std::string hand_frame_{"gripper_grasping_frame"};
 
-  moveit::task_constructor::Task task_;
+  // moveit::task_constructor::Task task_;
   std::unique_ptr<moveit::task_constructor::stages::CurrentState> stage_state_current_;
   std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
   interpolation_planner_;
