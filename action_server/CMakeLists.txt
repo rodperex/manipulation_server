@@ -12,8 +12,9 @@ find_package(rclcpp_action REQUIRED)
 find_package(moveit_task_constructor_core REQUIRED)
 find_package(manipulation_interfaces REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
+find_package(rclcpp_cascade_lifecycle REQUIRED)
 find_package(rclcpp_components REQUIRED)
-find_package(backward_ros REQUIRED)
+# find_package(backward_ros REQUIRED)
 
 
 set(dependencies
@@ -24,7 +25,8 @@ set(dependencies
     ament_index_cpp
     moveit_task_constructor_core
     manipulation_interfaces
-    backward_ros
+    # backward_ros
+    rclcpp_cascade_lifecycle
 )
 
 include_directories(
@@ -32,7 +34,8 @@ include
 )
 add_library(manipulation_server SHARED
   src/manipulation/ManipulationServer.cpp 
-  src/manipulation/MTCNode.cpp
+  # src/manipulation/MTCNode.cpp
+  src/manipulation/manipulation_behaviors.cpp
 )
 ament_target_dependencies(manipulation_server ${dependencies})
 

@@ -5,8 +5,16 @@
 #include <thread>
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 #include "lifecycle_msgs/msg/state.hpp"
+
+#include "lifecycle_msgs/msg/state.hpp"
+#include "rclcpp_cascade_lifecycle/rclcpp_cascade_lifecycle.hpp"
+
+#include "cascade_lifecycle_msgs/msg/activation.hpp"
+#include "cascade_lifecycle_msgs/msg/state.hpp"
+
 #include "rclcpp_action/rclcpp_action.hpp"
-#include "manipulation_interfaces/action/move_to_predefined.hpp"
+
+#include "manipulation/manipulation_behaviors.hpp"
 #include <moveit/planning_scene/planning_scene.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit/task_constructor/task.h>
@@ -19,43 +27,51 @@
 namespace manipulation
 {
 
-class ManipulationServer : public rclcpp_lifecycle::LifecycleNode
+using CallbackReturn =
+  rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
+
+class ManipulationServer : public  rclcpp_cascade_lifecycle::CascadeLifecycleNode
 {
 public:
-  using MoveToPredefined = manipulation_interfaces::action::MoveToPredefined;
-  using GoalHandleMove = rclcpp_action::ServerGoalHandle<MoveToPredefined>;
 
   ManipulationServer(
     const rclcpp::NodeOptions & options = rclcpp::NodeOptions()
   );
   virtual ~ManipulationServer();
 
-  rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
+  CallbackReturn
   on_configure(const rclcpp_lifecycle::State & state) override;
-  rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
+  CallbackReturn
   on_activate(const rclcpp_lifecycle::State & state) override;
-  rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
+  CallbackReturn
   on_deactivate(const rclcpp_lifecycle::State & state) override;
-  rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
+  CallbackReturn
   on_cleanup(const rclcpp_lifecycle::State & state) override;
-  rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
+  CallbackReturn
   on_shutdown(const rclcpp_lifecycle::State & state) override;
 
 private:
-  rclcpp_action::Server<MoveToPredefined>::SharedPtr action_server_;
+  rclcpp_action::Server<MoveToPredefined>::SharedPtr action_server_predefined_;
+  rclcpp_action::Server<Pick>::SharedPtr action_server_pick_;
 
   rclcpp_action::GoalResponse handle_move_to_predefined_goal(
     const rclcpp_action::GoalUUID & uuid,
     std::shared_ptr<const MoveToPredefined::Goal> goal);
+  rclcpp_action::GoalResponse handle_pick_goal(
+    const rclcpp_action::GoalUUID & uuid,
+    std::shared_ptr<const Pick::Goal> goal);
 
   rclcpp_action::CancelResponse handle_move_to_predefined_cancel(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<MoveToPredefined>> goal_handle);
+  rclcpp_action::CancelResponse handle_pick_cancel(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<Pick>> goal_handle);
 
   void handle_move_to_predefined_accepted(
-    const std::shared_ptr<GoalHandleMove> goal_handle);
+    const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle);
+  void handle_pick_accepted(
+    const std::shared_ptr<GoalHandlePick> goal_handle);
 
-  void execute_move_to_predefined(const std::shared_ptr<GoalHandleMove> goal_handle);
-
+  // void execute_move_to_predefined(const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle);
 
   std::string group_, goal_;
 
@@ -75,7 +91,6 @@ private:
   rclcpp::executors::MultiThreadedExecutor executor_;
   std::unique_ptr<std::thread> node_thread_;
   std::unique_ptr<std::thread> task_thread_;
-
 
 };
 
