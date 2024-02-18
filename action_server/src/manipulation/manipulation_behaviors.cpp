@@ -1,8 +1,14 @@
 #include "manipulation/manipulation_behaviors.hpp"
 #include <map>
+#include <moveit_msgs/srv/get_planning_scene.hpp>
+#include <algorithm>
+#include <chrono>
+
 
 namespace manipulation
 {
+
+using namespace std::chrono_literals;
 
 moveit::task_constructor::Task ConfigureTask(const std::string& task_name, rclcpp::Node::SharedPtr node)
 {
@@ -57,7 +63,6 @@ bool SendTask(moveit::task_constructor::Task& task, rclcpp::Node::SharedPtr node
   task.clear();
   return ret;
 }
-
 
 void ExecuteMoveToPredefined(const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle, rclcpp::Node::SharedPtr node)
 {
@@ -263,11 +268,67 @@ void ExecutePick(const std::shared_ptr<GoalHandlePick> goal_handle, rclcpp::Node
   }
   else
   {
-    RCLCPP_INFO(node->get_logger(), "Goal succeeded");
-    result->success = true;
-    goal_handle->succeed(result);
+    if (EvaluateJoint(std::map<std::string, double>{ { "gripper_right_finger_joint", 0.0 }, { "gripper_left_finger_joint", 0.0 }}, 0.01, node))
+    {
+      RCLCPP_INFO(node->get_logger(), "Goal succeeded");
+      result->success = true;
+      goal_handle->succeed(result);
+    }
+    else
+    {
+      RCLCPP_ERROR(node->get_logger(), "Goal failed");
+      result->success = false;
+      goal_handle->succeed(result);
+    }
   } 
 
 }
 
-}  // namespace manipulation
+bool EvaluateJoint(const std::map<std::string, double>& desired_joint_values, const double& tolerance, const rclcpp::Node::SharedPtr& node)
+{
+  auto client = node->create_client<moveit_msgs::srv::GetPlanningScene>("get_planning_scene");
+  if (client->wait_for_service(2.0s)) {
+		auto req = std::make_shared<moveit_msgs::srv::GetPlanningScene::Request>();
+		req->components.components = moveit_msgs::msg::PlanningSceneComponents::ROBOT_STATE;
+
+    auto res_future = client->async_send_request(req);
+
+		if (rclcpp::spin_until_future_complete(node, res_future) == rclcpp::FutureReturnCode::SUCCESS) {
+			auto res = res_future.get();
+			// check if names in desired_joint_values are in res->scene.robot_state.joint_state.name
+    // Use std::all_of with a lambda function
+    bool are_joints_values_within_tolerance = std::all_of(
+      desired_joint_values.begin(),
+      desired_joint_values.end(),
+      [&res, tolerance](const auto& pair) {
+          const std::string& joint_name = pair.first;
+          double desired_value = pair.second;
+
+          auto it = std::find(res->scene.robot_state.joint_state.name.begin(), res->scene.robot_state.joint_state.name.end(), joint_name);
+
+          if (it != res->scene.robot_state.joint_state.name.end()) {
+              // Joint name found, get the corresponding index
+              size_t index = std::distance(res->scene.robot_state.joint_state.name.begin(), it);
+
+              // Check if the value at the corresponding index is within the tolerance
+              return std::abs(res->scene.robot_state.joint_state.position[index] - desired_value) <= tolerance;
+          } else {
+              // Joint name not found in robot state
+              return false;
+          }
+      }
+    );
+
+		}
+    else
+    {
+      return false;
+    }                           
+  }
+  else
+  {
+    return false;
+  }
+  
+}
+} // end namespace manipulation
