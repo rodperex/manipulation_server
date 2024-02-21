@@ -6,8 +6,8 @@ namespace manipulation
 {
 // todos:
 // add parameters
-// what if we inherit from task 
 // able to prempt the task
+// add the rest actions
 ManipulationServer::ManipulationServer(const rclcpp::NodeOptions & options)
 : rclcpp_cascade_lifecycle::CascadeLifecycleNode("manipulation_action_server", "", options),
   node_{std::make_shared<rclcpp::Node>("manipulation_action_server_executor", options)}

@@ -187,7 +187,7 @@ void ExecutePick(const std::shared_ptr<GoalHandlePick> goal_handle, rclcpp::Node
       stage->properties().set("marker_ns", "grasp_pose");
       stage->setPreGraspPose("open");
       stage->setObject(object.id);
-      stage->setAngleDelta(M_PI / 8);
+      stage->setAngleDelta(M_PI / 16);
       stage->setMonitoredStage(current_state_ptr);  // Hook into current state
 
       // This is the transform from the object frame to the end-effector frame THIS IS SO IMPORTANT
@@ -258,6 +258,11 @@ void ExecutePick(const std::shared_ptr<GoalHandlePick> goal_handle, rclcpp::Node
       grasp->insert(std::move(stage));
     }
     task_.add(std::move(grasp));
+  }
+  {
+    auto stage = std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("clear scene");
+    stage->removeObject(object.id);
+    task_.add(std::move(stage));
   }
 
   if (!SendTask(task_, node))
