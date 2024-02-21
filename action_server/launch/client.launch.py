@@ -23,7 +23,7 @@ def generate_launch_description():
         executable='client',
         output='screen',
         parameters=[{
-            'use_sim_time': True,
+            'use_sim_time': False,
         }, params]
     )
 

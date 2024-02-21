@@ -24,27 +24,27 @@ namespace manipulation
 {
 
 
-
 class MTCNode
 {
-public:    
-    MTCNode(const rclcpp::NodeOptions& options,
-            std::string group,
-            std::string goal);
+public:
+  MTCNode(
+    const rclcpp::NodeOptions & options,
+    std::string group,
+    std::string goal);
 
-    rclcpp::node_interfaces::NodeBaseInterface::SharedPtr get_node_base_interface();
+  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr get_node_base_interface();
 
-    void do_task();
-    void setup_planning_scene();
+  void do_task();
+  void setup_planning_scene();
 
 private:
-    moveit::task_constructor::Task create_task();
+  moveit::task_constructor::Task create_task();
 
-    moveit::task_constructor::Task task_;
+  moveit::task_constructor::Task task_;
 
-    rclcpp::Node::SharedPtr node_;
+  rclcpp::Node::SharedPtr node_;
 
-    std::string group_, goal_;
+  std::string group_, goal_;
 };
 
 } // end namespace manipulation
