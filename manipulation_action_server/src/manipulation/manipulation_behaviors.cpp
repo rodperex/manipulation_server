@@ -130,13 +130,21 @@ void ExecutePick(
     std::make_unique<moveit::task_constructor::stages::MoveTo>(
     "open_gripper",
     interpolation_planner);
-  stage_open_gripper->setGroup(goal_handle->get_goal()->gripper_group);
-  stage_open_gripper->setGoal(goal_handle->get_goal()->open_pose);  
+  
+  std::string arm_group =
+    node->get_parameter("arm_group").as_string();
+  std::string gripper_group =
+    node->get_parameter("gripper_group").as_string();
+  std::string open_pose =
+    node->get_parameter("pose_open").as_string();
+
+  stage_open_gripper->setGroup(gripper_group);
+  stage_open_gripper->setGoal(open_pose);
   task_.add(std::move(stage_open_gripper));
 
   auto stage_move_to_pick = std::make_unique<moveit::task_constructor::stages::Connect>(
-      "move to pick",
-      moveit::task_constructor::stages::Connect::GroupPlannerVector{ { "arm_torso", interpolation_planner } });
+      "move_to_pick",
+      moveit::task_constructor::stages::Connect::GroupPlannerVector{ { arm_group, interpolation_planner } });
   // clang-format on
   stage_move_to_pick->setTimeout(3.0);
   stage_move_to_pick->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT);
@@ -178,7 +186,7 @@ void ExecutePick(
       auto stage = std::make_unique<moveit::task_constructor::stages::GenerateGraspPose>("generate grasp pose");
       stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT);
       stage->properties().set("marker_ns", "grasp_pose");
-      stage->setPreGraspPose("open");
+      stage->setPreGraspPose(open_pose);
       stage->setObject(object.id);
       stage->setAngleDelta(M_PI / 16);
       stage->setMonitoredStage(current_state_ptr);  // Hook into current state

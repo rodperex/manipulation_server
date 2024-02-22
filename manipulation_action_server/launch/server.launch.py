@@ -16,6 +16,15 @@ def generate_launch_description():
 
     ld = LaunchDescription()
 
+    pkg_dir = get_package_share_directory('action_server')
+
+    params_file = os.path.join(
+        pkg_dir,
+        'params',   
+        'params.yaml'
+    )
+
+
     mappings = {
         'arm': 'right-arm',
         'camera_model': 'orbbec-astra',
@@ -57,16 +66,17 @@ def generate_launch_description():
         "capabilities": "move_group/ExecuteTaskSolutionCapability"
     }
 
-    robot_cmd = Node(
+    server_cmd = Node(
         package='action_server',
         executable='server',
         output='screen',
         parameters=[
             moveit_config.to_dict(),
             {'use_sim_time': False},
-            move_group_capabilities
+            move_group_capabilities,
+            params_file
         ]
     )
 
-    ld.add_action(robot_cmd)
+    ld.add_action(server_cmd)
     return ld

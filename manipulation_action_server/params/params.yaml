@@ -1,0 +1,5 @@
+manipulation_action_server_executor:
+  ros__parameters:
+    gripper_group: gripper
+    pose_open: open
+    arm_group: arm_torso
