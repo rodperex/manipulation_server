@@ -27,7 +27,7 @@ ManipulationServer::on_configure(const rclcpp_lifecycle::State & state)
   RCLCPP_INFO(get_logger(), "Configuring manipulation server");
   action_server_predefined_ = rclcpp_action::create_server<MoveToPredefined>(
     this,
-    "move_robot_to_predefined",
+    "move_to_predefined",
     std::bind(
       &ManipulationServer::handle_move_to_predefined_goal, this, std::placeholders::_1,
       std::placeholders::_2),
@@ -50,10 +50,22 @@ ManipulationServer::on_configure(const rclcpp_lifecycle::State & state)
   // task_.loadRobotModel(node_);
   // task_.setProperty("ik_frame", "gripper_grasping_frame");
 
+  cartesian_planner_ =
+    std::make_shared<moveit::task_constructor::solvers::CartesianPath>();
+  cartesian_planner_->setMaxVelocityScalingFactor(1.0);
+  cartesian_planner_->setMaxAccelerationScalingFactor(1.0);
+  cartesian_planner_->setStepSize(.01);
+
+  sampling_planner_ =
+    std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node_);
+
   node_thread_ = std::make_unique<std::thread>(
     [this]() {
       executor_.add_node(node_);
-      executor_.spin();
+      // executor_.spin();
+      while(!should_exit_){
+        executor_.spin_some();
+      }
       executor_.remove_node(node_);
     });
 
@@ -89,7 +101,10 @@ ManipulationServer::on_cleanup(const rclcpp_lifecycle::State & state)
 CallbackReturn
 ManipulationServer::on_shutdown(const rclcpp_lifecycle::State & state)
 {
-  node_thread_->join();
+  if (node_thread_->joinable()) {
+    node_thread_->join();
+    RCLCPP_INFO(get_logger(), "Thread joining...");
+  }
   RCLCPP_INFO(get_logger(), "Shutting down manipulation server");
   return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
 }
@@ -138,14 +153,14 @@ void
 ManipulationServer::handle_move_to_predefined_accepted(
   const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle)
 {
-  RCLCPP_INFO(this->get_logger(), "Goal accepted");
+  RCLCPP_INFO(this->get_logger(), "Goal accepted (move_to_predefined): %s", goal_handle->get_goal()->goal_pose.c_str());
 
   // task_thread_ = std::make_unique<std::thread>(
   //       std::bind(&ManipulationServer::execute_move_to_predefined, this, std::placeholders::_1),
   //       goal_handle
   // );
   // task_thread_->detach();
-  ExecuteMoveToPredefined(goal_handle, node_);
+  ExecuteMoveToPredefined(goal_handle, node_, interpolation_planner_);
 
 }
 
@@ -153,12 +168,9 @@ void
 ManipulationServer::handle_pick_accepted(
   const std::shared_ptr<GoalHandlePick> goal_handle)
 {
-  RCLCPP_INFO(this->get_logger(), "Goal accepted");
+  RCLCPP_INFO(this->get_logger(), "Goal accepted (pick): %s", goal_handle->get_goal()->object_goal.id.c_str());
 
-  std::thread{
-        std::bind(&ExecutePick, std::placeholders::_1, std::placeholders::_2),
-        goal_handle, node_
-  }.detach();
+  ExecutePick(goal_handle, node_, interpolation_planner_, cartesian_planner_);
 }
 
 // void

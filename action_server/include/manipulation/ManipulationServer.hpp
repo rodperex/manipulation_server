@@ -40,15 +40,15 @@ public:
   virtual ~ManipulationServer();
 
   CallbackReturn
-  on_configure(const rclcpp_lifecycle::State & state) override;
+    on_configure(const rclcpp_lifecycle::State & state) override;
   CallbackReturn
-  on_activate(const rclcpp_lifecycle::State & state) override;
+    on_activate(const rclcpp_lifecycle::State & state) override;
   CallbackReturn
-  on_deactivate(const rclcpp_lifecycle::State & state) override;
+    on_deactivate(const rclcpp_lifecycle::State & state) override;
   CallbackReturn
-  on_cleanup(const rclcpp_lifecycle::State & state) override;
+    on_cleanup(const rclcpp_lifecycle::State & state) override;
   CallbackReturn
-  on_shutdown(const rclcpp_lifecycle::State & state) override;
+    on_shutdown(const rclcpp_lifecycle::State & state) override;
 
 private:
   rclcpp_action::Server<MoveToPredefined>::SharedPtr action_server_predefined_;
@@ -82,8 +82,15 @@ private:
 
   // moveit::task_constructor::Task task_;
   std::unique_ptr<moveit::task_constructor::stages::CurrentState> stage_state_current_;
+  
   std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
-  interpolation_planner_;
+    interpolation_planner_;
+  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath>
+    cartesian_planner_;
+  std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner>
+    sampling_planner_;
+
+
   moveit::planning_interface::PlanningSceneInterface planning_interface_;
   moveit::task_constructor::Stage * current_state_ptr_{nullptr};
 
@@ -91,6 +98,8 @@ private:
   rclcpp::executors::MultiThreadedExecutor executor_;
   std::unique_ptr<std::thread> node_thread_;
   std::unique_ptr<std::thread> task_thread_;
+
+  std::atomic<bool> should_exit_{false};
 
 };
 

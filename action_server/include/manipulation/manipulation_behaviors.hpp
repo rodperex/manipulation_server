@@ -33,9 +33,20 @@ using GoalHandleMoveToPredefined = rclcpp_action::ServerGoalHandle<MoveToPredefi
 using Pick = manipulation_interfaces::action::Pick;
 using GoalHandlePick = rclcpp_action::ServerGoalHandle<Pick>;
 
-void ExecuteMoveToPredefined(const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle, rclcpp::Node::SharedPtr node);
-void ExecutePick(const std::shared_ptr<GoalHandlePick> goal_handle, rclcpp::Node::SharedPtr node);
-bool EvaluateJoint(const std::map<std::string, double>& desired_joint_values, const double& tolerance, const rclcpp::Node::SharedPtr& node);
+void ExecuteMoveToPredefined(
+    const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle,
+    rclcpp::Node::SharedPtr node,
+    std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner);
+void ExecutePick(
+    const std::shared_ptr<GoalHandlePick> goal_handle,
+    rclcpp::Node::SharedPtr node,
+    std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
+    std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner);
+bool EvaluateJoint(
+    const std::map<std::string,
+    double>& desired_joint_values,
+    const double& tolerance,
+    const rclcpp::Node::SharedPtr& node);
 
 moveit::task_constructor::Task ConfigureTask(const std::string& task_name, rclcpp::Node::SharedPtr node);
 

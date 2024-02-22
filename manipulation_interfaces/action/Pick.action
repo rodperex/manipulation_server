@@ -1,5 +1,8 @@
 # Request
+string gripper_group
+string open_pose
 moveit_msgs/CollisionObject object_goal
+
 # Is it better to use only the tf and then extract the collision from the tf ?
 ---
 # Result

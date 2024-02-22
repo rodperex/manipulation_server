@@ -12,33 +12,30 @@ using namespace std::chrono_literals;
 
 moveit::task_constructor::Task ConfigureTask(const std::string& task_name, rclcpp::Node::SharedPtr node)
 {
-  moveit::task_constructor::Task task_;
+  moveit::task_constructor::Task task;
 
-  task_.stages()->setName(task_name);
-  task_.loadRobotModel(node);
+  task.stages()->setName(task_name);
+  task.loadRobotModel(node);
 
   // let properties be a node parameter
-  task_.setProperty("ik_frame", "gripper_grasping_frame");
-  task_.setProperty("group", "arm_torso");
-  task_.setProperty("eef", "gripper");
+  task.setProperty("ik_frame", "gripper_grasping_frame");
+  task.setProperty("group", "arm_torso");
+  task.setProperty("eef", "gripper");
 
-  return task_;
+  return task;
 }
 
-bool SendTask(moveit::task_constructor::Task& task, rclcpp::Node::SharedPtr node )
+bool SendTask(moveit::task_constructor::Task& task, rclcpp::Node::SharedPtr node)
 {
-  auto ret = false;
   try {
     task.init();
   } catch (moveit::task_constructor::InitStageException & e) {
     RCLCPP_ERROR_STREAM(node->get_logger(), e);
-    ret = false;
-    return ret;
+    return false;
   }
   if (!task.plan(5)) {
     RCLCPP_ERROR_STREAM(node->get_logger(), "Task planning failed");
-    ret = false;
-    return ret;
+    return false;
   }
   RCLCPP_INFO_STREAM(node->get_logger(), "Task planning succeeded, sending plan to execute");
 
@@ -51,20 +48,23 @@ bool SendTask(moveit::task_constructor::Task& task, rclcpp::Node::SharedPtr node
   if (!solutionsVector.empty()) {
     auto plan_result = task.execute(*solutionsVector[0]);
     if (plan_result.val != moveit_msgs::msg::MoveItErrorCodes::SUCCESS) {
-      ret = false;
       RCLCPP_ERROR_STREAM(node->get_logger(), "Task execution failed");
+      return false;
     }
     RCLCPP_INFO_STREAM(node->get_logger(), "Task execution succeeded");
-    ret = true;
+    task.clear();
+    return true;
   } else {
     RCLCPP_ERROR_STREAM(node->get_logger(), "No solutions found");
-    ret = false;
+    task.clear();
+    return false;
   }  
-  task.clear();
-  return ret;
 }
 
-void ExecuteMoveToPredefined(const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle, rclcpp::Node::SharedPtr node)
+void ExecuteMoveToPredefined(
+  const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle,
+  rclcpp::Node::SharedPtr node,
+  std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner)
 {
   RCLCPP_INFO(node->get_logger(), "Executing goal");
 
@@ -72,27 +72,24 @@ void ExecuteMoveToPredefined(const std::shared_ptr<GoalHandleMoveToPredefined> g
   result->success = false;
   auto goal = goal_handle->get_goal();
 
-  auto task_ = ConfigureTask("move_to_predefined task", node);
+  auto task = ConfigureTask("move_to_predefined_task", node);
 
   RCLCPP_INFO(node->get_logger(), "Setting group: %s", goal->group_name.c_str());
   RCLCPP_INFO(node->get_logger(), "Setting goal: %s", goal->goal_pose.c_str());
 
   auto stage_state_current = std::make_unique<moveit::task_constructor::stages::CurrentState>(
     "current");
-  task_.add(std::move(stage_state_current));
+  task.add(std::move(stage_state_current));
 
-  auto interpolation_planner =
-    std::make_shared<moveit::task_constructor::solvers::JointInterpolationPlanner>();
-
-  auto stage_predefined_position =
+  auto stage_move_to_predefined =
     std::make_unique<moveit::task_constructor::stages::MoveTo>(
-    "stage_predefined_position",
+    "predefined",
     interpolation_planner);
-  stage_predefined_position->setGroup(goal->group_name);
-  stage_predefined_position->setGoal(goal->goal_pose);
-  task_.add(std::move(stage_predefined_position));
+  stage_move_to_predefined->setGroup(goal->group_name);
+  stage_move_to_predefined->setGoal(goal->goal_pose);
+  task.add(std::move(stage_move_to_predefined));
 
-  if (!SendTask(task_, node))
+  if (!SendTask(task, node))
   {
     result->success = false;   
     goal_handle->succeed(result);
@@ -106,7 +103,11 @@ void ExecuteMoveToPredefined(const std::shared_ptr<GoalHandleMoveToPredefined> g
   }
 }
 
-void ExecutePick(const std::shared_ptr<GoalHandlePick> goal_handle, rclcpp::Node::SharedPtr node)
+void ExecutePick(
+  const std::shared_ptr<GoalHandlePick> goal_handle,
+  rclcpp::Node::SharedPtr node,
+  std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
+  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner)
 {
   RCLCPP_INFO_STREAM(node->get_logger(), "Executing pick");
   
@@ -114,7 +115,7 @@ void ExecutePick(const std::shared_ptr<GoalHandlePick> goal_handle, rclcpp::Node
   auto goal = goal_handle->get_goal();
   auto object = goal->object_goal;
 
-  auto task_ = ConfigureTask("pick task", node);
+  auto task_ = ConfigureTask("pick_task", node);
 
   moveit::planning_interface::PlanningSceneInterface psi;
   psi.applyCollisionObject(goal->object_goal);
@@ -123,25 +124,17 @@ void ExecutePick(const std::shared_ptr<GoalHandlePick> goal_handle, rclcpp::Node
   auto stage_state_current = std::make_unique<moveit::task_constructor::stages::CurrentState>(
     "current");
   current_state_ptr = stage_state_current.get();
-
   task_.add(std::move(stage_state_current));
   
-  auto interpolation_planner =
-    std::make_shared<moveit::task_constructor::solvers::JointInterpolationPlanner>();
-  auto cartesian_planner = std::make_shared<moveit::task_constructor::solvers::CartesianPath>();
-    cartesian_planner->setMaxVelocityScalingFactor(1.0);
-    cartesian_planner->setMaxAccelerationScalingFactor(1.0);
-    cartesian_planner->setStepSize(.01);
-
   auto stage_open_gripper =
     std::make_unique<moveit::task_constructor::stages::MoveTo>(
-    "open gripper",
+    "open_gripper",
     interpolation_planner);
-  stage_open_gripper->setGroup("gripper");
-  stage_open_gripper->setGoal("open");  
+  stage_open_gripper->setGroup(goal_handle->get_goal()->gripper_group);
+  stage_open_gripper->setGoal(goal_handle->get_goal()->open_pose);  
   task_.add(std::move(stage_open_gripper));
 
-   auto stage_move_to_pick = std::make_unique<moveit::task_constructor::stages::Connect>(
+  auto stage_move_to_pick = std::make_unique<moveit::task_constructor::stages::Connect>(
       "move to pick",
       moveit::task_constructor::stages::Connect::GroupPlannerVector{ { "arm_torso", interpolation_planner } });
   // clang-format on
@@ -334,6 +327,5 @@ bool EvaluateJoint(const std::map<std::string, double>& desired_joint_values, co
   {
     return false;
   }
-  
 }
 } // end namespace manipulation
