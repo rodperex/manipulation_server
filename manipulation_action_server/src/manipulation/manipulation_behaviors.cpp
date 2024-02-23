@@ -117,7 +117,6 @@ void ExecutePick(
 
   auto task = ConfigureTask("pick_task", node);
 
-  // moveit::planning_interface::PlanningSceneInterface psi;
   psi.applyCollisionObject(goal->object_goal);
 
   moveit::task_constructor::Stage* current_state_ptr = nullptr;
@@ -168,7 +167,8 @@ void ExecutePick(
     {
       // 3.1. Approach object
       auto stage =
-          std::make_unique<moveit::task_constructor::stages::MoveRelative>("approach_object", cartesian_planner);
+          std::make_unique<moveit::task_constructor::stages::MoveRelative>
+          ("approach_object", cartesian_planner);
 
       stage->properties().set("marker_ns", "approach_object");
       stage->properties().set("link", node->get_parameter("ik_frame"));
@@ -198,14 +198,15 @@ void ExecutePick(
                             Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
                             Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitZ());
       grasp_frame_transform.linear() = q.matrix();
-      grasp_frame_transform.translation().z() = 0.0; //check this
+      //TO DO: adapt to object shape
+      grasp_frame_transform.translation().z() = 0.0; 
       grasp_frame_transform.translation().x() = 0.03; //check this also this can be done like in a fallback
 
       // Compute IK
       auto wrapper =
           std::make_unique<moveit::task_constructor::stages::ComputeIK>("grasp_pose_IK", std::move(stage));
-      wrapper->setMaxIKSolutions(8);
-      wrapper->setMinSolutionDistance(1.0);
+      wrapper->setMaxIKSolutions(8); // param?
+      wrapper->setMinSolutionDistance(1.0); // param?
       wrapper->setIKFrame(grasp_frame_transform, (node->get_parameter("ik_frame")).as_string());
       wrapper->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, { "eef", "group" });
       wrapper->properties().configureInitFrom(moveit::task_constructor::Stage::INTERFACE, { "target_pose" });
@@ -213,7 +214,7 @@ void ExecutePick(
     }
 
     {
-      // 3.3. Allow collisions
+      // 3.3. Allow collisions with the object so it can be grasped
       auto stage =
           std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("allow_collision");
       stage->allowCollisions(object.id,
@@ -305,8 +306,10 @@ bool EvaluateJoint(const std::map<std::string, double>& desired_joint_values,
   const std::vector<double>& tolerances,
   const rclcpp::Node::SharedPtr& node)
 {
+  // Not the best option creating a node here, but it is the easiest way
+  auto node_aux = rclcpp::Node::make_shared("service_client_node");
   bool are_joints_values_within_tolerance = false;
-  auto client = node->create_client<moveit_msgs::srv::GetPlanningScene>("get_planning_scene");
+  auto client = node_aux->create_client<moveit_msgs::srv::GetPlanningScene>("get_planning_scene");
   
   if (client->wait_for_service(2.0s)) {
 		auto req = std::make_shared<moveit_msgs::srv::GetPlanningScene::Request>();
@@ -314,7 +317,7 @@ bool EvaluateJoint(const std::map<std::string, double>& desired_joint_values,
 
     auto res_future = client->async_send_request(req);
 
-		if (rclcpp::spin_until_future_complete(node, res_future) == rclcpp::FutureReturnCode::SUCCESS) {
+		if (rclcpp::spin_until_future_complete(node_aux, res_future) == rclcpp::FutureReturnCode::SUCCESS) {
 			auto res = res_future.get();
 			// Check if names in desired_joint_values are in res->scene.robot_state.joint_state.name
       // Use std::all_of with a lambda function
@@ -341,6 +344,5 @@ bool EvaluateJoint(const std::map<std::string, double>& desired_joint_values,
 		}                          
   }
   return are_joints_values_within_tolerance;
-
 }
 } // end namespace manipulation
