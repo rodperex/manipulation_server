@@ -17,10 +17,9 @@ moveit::task_constructor::Task ConfigureTask(const std::string& task_name, rclcp
   task.stages()->setName(task_name);
   task.loadRobotModel(node);
 
-  // let properties be a node parameter
-  task.setProperty("ik_frame", "gripper_grasping_frame");
-  task.setProperty("group", "arm_torso");
-  task.setProperty("eef", "gripper");
+  task.setProperty("ik_frame", node->get_parameter("ik_frame").as_string());
+  task.setProperty("group", node->get_parameter("group").as_string());
+  task.setProperty("eef", node->get_parameter("eef").as_string());
 
   return task;
 }
@@ -107,7 +106,8 @@ void ExecutePick(
   const std::shared_ptr<GoalHandlePick> goal_handle,
   rclcpp::Node::SharedPtr node,
   std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
-  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner)
+  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
+  moveit::planning_interface::PlanningSceneInterface psi)
 {
   RCLCPP_INFO_STREAM(node->get_logger(), "Executing pick");
   
@@ -115,75 +115,76 @@ void ExecutePick(
   auto goal = goal_handle->get_goal();
   auto object = goal->object_goal;
 
-  auto task_ = ConfigureTask("pick_task", node);
+  auto task = ConfigureTask("pick_task", node);
 
-  moveit::planning_interface::PlanningSceneInterface psi;
+  // moveit::planning_interface::PlanningSceneInterface psi;
   psi.applyCollisionObject(goal->object_goal);
 
   moveit::task_constructor::Stage* current_state_ptr = nullptr;
   auto stage_state_current = std::make_unique<moveit::task_constructor::stages::CurrentState>(
     "current");
   current_state_ptr = stage_state_current.get();
-  task_.add(std::move(stage_state_current));
-  
-  auto stage_open_gripper =
-    std::make_unique<moveit::task_constructor::stages::MoveTo>(
-    "open_gripper",
-    interpolation_planner);
-  
+  task.add(std::move(stage_state_current));
+
   std::string arm_group =
     node->get_parameter("arm_group").as_string();
   std::string gripper_group =
     node->get_parameter("gripper_group").as_string();
   std::string open_pose =
     node->get_parameter("pose_open").as_string();
-
+  std::string close_pose =
+    node->get_parameter("pose_close").as_string();
+  
+  // 1. Open gripper
+  auto stage_open_gripper =
+    std::make_unique<moveit::task_constructor::stages::MoveTo>(
+    "open_gripper",
+    interpolation_planner);
+  
   stage_open_gripper->setGroup(gripper_group);
   stage_open_gripper->setGoal(open_pose);
-  task_.add(std::move(stage_open_gripper));
+  task.add(std::move(stage_open_gripper));
 
+  // 2. Move to pick
   auto stage_move_to_pick = std::make_unique<moveit::task_constructor::stages::Connect>(
       "move_to_pick",
       moveit::task_constructor::stages::Connect::GroupPlannerVector{ { arm_group, interpolation_planner } });
-  // clang-format on
+
   stage_move_to_pick->setTimeout(3.0);
   stage_move_to_pick->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT);
-  task_.add(std::move(stage_move_to_pick));
+  task.add(std::move(stage_move_to_pick));
 
-  // clang-format off
   moveit::task_constructor::Stage* attach_object_stage =
       nullptr;  // Forward attach_object_stage to place pose generator
-  // clang-format on
+
+  // 2. Pick object
   {
     auto grasp = std::make_unique<moveit::task_constructor::SerialContainer>("pick object");
-    task_.properties().exposeTo(grasp->properties(), { "eef", "group", "ik_frame" });
+    task.properties().exposeTo(grasp->properties(), { "eef", "group", "ik_frame" });
     // clang-format off
     grasp->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT,
                                           { "eef", "group", "ik_frame" });
-    // clang-format off
+
     {
+      // 3.1. Approach object
       auto stage =
-          std::make_unique<moveit::task_constructor::stages::MoveRelative>("approach object", cartesian_planner);
-      // clang-format on
+          std::make_unique<moveit::task_constructor::stages::MoveRelative>("approach_object", cartesian_planner);
+
       stage->properties().set("marker_ns", "approach_object");
-      stage->properties().set("link", "gripper_grasping_frame");
+      stage->properties().set("link", node->get_parameter("ik_frame"));
       stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, { "group" });
       stage->setMinMaxDistance(0.0, 0.15);
 
       // Set hand forward direction
       geometry_msgs::msg::Vector3Stamped vec;
-      vec.header.frame_id = "gripper_grasping_frame";
+      vec.header.frame_id = (node->get_parameter("ik_frame")).as_string();
       vec.vector.x = 1.0;
       stage->setDirection(vec);
       grasp->insert(std::move(stage));
     }
-
-    /****************************************************
-  ---- *               Generate Grasp Pose                *
-     ***************************************************/
     {
-      // Sample grasp pose
-      auto stage = std::make_unique<moveit::task_constructor::stages::GenerateGraspPose>("generate grasp pose");
+      // 3.2. Generate grasp pose
+      auto stage = std::make_unique<moveit::task_constructor::stages::GenerateGraspPose>("generate_grasp_pose");
       stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT);
       stage->properties().set("marker_ns", "grasp_pose");
       stage->setPreGraspPose(open_pose);
@@ -194,61 +195,59 @@ void ExecutePick(
       // This is the transform from the object frame to the end-effector frame THIS IS SO IMPORTANT
       Eigen::Isometry3d grasp_frame_transform;
       Eigen::Quaterniond q = Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()) *
-                             Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
-                             Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitZ());
+                            Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
+                            Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitZ());
       grasp_frame_transform.linear() = q.matrix();
       grasp_frame_transform.translation().z() = 0.0; //check this
       grasp_frame_transform.translation().x() = 0.03; //check this also this can be done like in a fallback
 
       // Compute IK
-      // clang-format off
       auto wrapper =
-          std::make_unique<moveit::task_constructor::stages::ComputeIK>("grasp pose IK", std::move(stage));
-      // clang-format on
+          std::make_unique<moveit::task_constructor::stages::ComputeIK>("grasp_pose_IK", std::move(stage));
       wrapper->setMaxIKSolutions(8);
       wrapper->setMinSolutionDistance(1.0);
-      wrapper->setIKFrame(grasp_frame_transform, "gripper_grasping_frame");
+      wrapper->setIKFrame(grasp_frame_transform, (node->get_parameter("ik_frame")).as_string());
       wrapper->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, { "eef", "group" });
       wrapper->properties().configureInitFrom(moveit::task_constructor::Stage::INTERFACE, { "target_pose" });
       grasp->insert(std::move(wrapper));
     }
 
     {
-      // clang-format off
+      // 3.3. Allow collisions
       auto stage =
-          std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("allow collision (hand,object)");
+          std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("allow_collision");
       stage->allowCollisions(object.id,
-                             task_.getRobotModel()
-                                 ->getJointModelGroup("gripper")
-                                 ->getLinkModelNamesWithCollisionGeometry(),
-                             true);
-      // clang-format on
+                            task.getRobotModel()
+                            ->getJointModelGroup(node->get_parameter("eef").as_string())
+                            ->getLinkModelNamesWithCollisionGeometry(),
+                            true);
       grasp->insert(std::move(stage));
       
     }
 
     {
-      auto stage = std::make_unique<moveit::task_constructor::stages::MoveTo>("close hand", interpolation_planner);
-      stage->setGroup("gripper");
-      stage->setGoal("close");
+      // 3.4. Close gripper
+      auto stage = std::make_unique<moveit::task_constructor::stages::MoveTo>("close_hand", interpolation_planner);
+      stage->setGroup(node->get_parameter("eef").as_string());
+      stage->setGoal(close_pose);
       grasp->insert(std::move(stage));
     }
 
     {
-      auto stage = std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("attach object");
-      stage->attachObject(object.id, "gripper_grasping_frame");
+      // 3.5. Attach object
+      auto stage = std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("attach_object");
+      stage->attachObject(object.id, node->get_parameter("ik_frame").as_string());
       attach_object_stage = stage.get();
       grasp->insert(std::move(stage));
     }
 
     {
-      // clang-format off
+      // 3.6. Lift object
       auto stage =
-          std::make_unique<moveit::task_constructor::stages::MoveRelative>("lift object", cartesian_planner);
-      // clang-format on
+          std::make_unique<moveit::task_constructor::stages::MoveRelative>("lift_object", cartesian_planner);
       stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, { "group" });
       stage->setMinMaxDistance(0.1, 0.3);
-      stage->setIKFrame("gripper_grasping_frame");
+      stage->setIKFrame(node->get_parameter("ik_frame").as_string());
       stage->properties().set("marker_ns", "lift_object");
 
       // Set upward direction
@@ -258,41 +257,57 @@ void ExecutePick(
       stage->setDirection(vec);
       grasp->insert(std::move(stage));
     }
-    task_.add(std::move(grasp));
+    task.add(std::move(grasp));
   }
   {
-    auto stage = std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("clear scene");
-    stage->removeObject(object.id);
-    task_.add(std::move(stage));
+    // 4. Clear task
+    // auto stage = std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("clear");
+    // stage->removeObject(object.id); // should't we keep it in the scene?
+    // task.add(std::move(stage));
   }
 
-  if (!SendTask(task_, node))
-  {
+  if (!SendTask(task, node)) {
     result->success = false;   
     goal_handle->succeed(result);
     return;
-  }
-  else
-  {
-    if (EvaluateJoint(std::map<std::string, double>{ { "gripper_right_finger_joint", 0.0 }, { "gripper_left_finger_joint", 0.0 }}, 0.01, node))
-    {
+  } else { 
+    std::map<std::string, double> desired_joint_values;  
+    std::vector<std::string> gripper_joints;
+    std::vector<double> gripper_tolerances, gripper_closed;
+
+    node->get_parameter("gripper_joints", gripper_joints);
+    node->get_parameter("gripper_tolerances", gripper_tolerances);
+    node->get_parameter("gripper_closed", gripper_closed);
+
+    if ((gripper_joints.size() != gripper_tolerances.size()) ||
+        (gripper_joints.size() != gripper_closed.size())) {
+      result->success = false;
+      goal_handle->succeed(result);
+    }
+    for (size_t i = 0; i < gripper_joints.size(); i++) {
+      RCLCPP_INFO(node->get_logger(), "Goal failed: impossible to get desired gripper joints values");
+      desired_joint_values[gripper_joints[i]] = gripper_closed[i];
+    }
+
+    if (!EvaluateJoint(desired_joint_values, gripper_tolerances, node)) {
       RCLCPP_INFO(node->get_logger(), "Goal succeeded");
       result->success = true;
       goal_handle->succeed(result);
-    }
-    else
-    {
-      RCLCPP_ERROR(node->get_logger(), "Goal failed");
+    } else {
+      RCLCPP_ERROR(node->get_logger(), "Goal failed:: gripper joints are not within tolerance");
       result->success = false;
       goal_handle->succeed(result);
     }
   } 
-
 }
 
-bool EvaluateJoint(const std::map<std::string, double>& desired_joint_values, const double& tolerance, const rclcpp::Node::SharedPtr& node)
+bool EvaluateJoint(const std::map<std::string, double>& desired_joint_values,
+  const std::vector<double>& tolerances,
+  const rclcpp::Node::SharedPtr& node)
 {
+  bool are_joints_values_within_tolerance = false;
   auto client = node->create_client<moveit_msgs::srv::GetPlanningScene>("get_planning_scene");
+  
   if (client->wait_for_service(2.0s)) {
 		auto req = std::make_shared<moveit_msgs::srv::GetPlanningScene::Request>();
 		req->components.components = moveit_msgs::msg::PlanningSceneComponents::ROBOT_STATE;
@@ -301,39 +316,31 @@ bool EvaluateJoint(const std::map<std::string, double>& desired_joint_values, co
 
 		if (rclcpp::spin_until_future_complete(node, res_future) == rclcpp::FutureReturnCode::SUCCESS) {
 			auto res = res_future.get();
-			// check if names in desired_joint_values are in res->scene.robot_state.joint_state.name
-    // Use std::all_of with a lambda function
-    bool are_joints_values_within_tolerance = std::all_of(
-      desired_joint_values.begin(),
-      desired_joint_values.end(),
-      [&res, tolerance](const auto& pair) {
-          const std::string& joint_name = pair.first;
-          double desired_value = pair.second;
+			// Check if names in desired_joint_values are in res->scene.robot_state.joint_state.name
+      // Use std::all_of with a lambda function
+      are_joints_values_within_tolerance = std::all_of(
+        desired_joint_values.begin(),
+        desired_joint_values.end(),
+        [&res, tolerances](const auto& pair) {
+            const std::string& joint_name = pair.first;
+            double desired_value = pair.second;
 
-          auto it = std::find(res->scene.robot_state.joint_state.name.begin(), res->scene.robot_state.joint_state.name.end(), joint_name);
+            auto it = std::find(res->scene.robot_state.joint_state.name.begin(), res->scene.robot_state.joint_state.name.end(), joint_name);
 
-          if (it != res->scene.robot_state.joint_state.name.end()) {
-              // Joint name found, get the corresponding index
-              size_t index = std::distance(res->scene.robot_state.joint_state.name.begin(), it);
-
-              // Check if the value at the corresponding index is within the tolerance
-              return std::abs(res->scene.robot_state.joint_state.position[index] - desired_value) <= tolerance;
-          } else {
-              // Joint name not found in robot state
-              return false;
-          }
-      }
-    );
-
-		}
-    else
-    {
-      return false;
-    }                           
+            if (it != res->scene.robot_state.joint_state.name.end()) {
+                // Joint name found, get the corresponding index
+                size_t index = std::distance(res->scene.robot_state.joint_state.name.begin(), it);
+                // Check if the value at the corresponding index is within the tolerance
+                return std::abs(res->scene.robot_state.joint_state.position[index] - desired_value) <= tolerances[index];
+            } else {
+                // Joint name not found in robot state
+                return false;
+            }
+        }
+      );
+		}                          
   }
-  else
-  {
-    return false;
-  }
+  return are_joints_values_within_tolerance;
+
 }
 } // end namespace manipulation

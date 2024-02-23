@@ -170,7 +170,7 @@ ManipulationServer::handle_pick_accepted(
 {
   RCLCPP_INFO(this->get_logger(), "Goal accepted (pick): %s", goal_handle->get_goal()->object_goal.id.c_str());
 
-  ExecutePick(goal_handle, node_, interpolation_planner_, cartesian_planner_);
+  ExecutePick(goal_handle, node_, interpolation_planner_, cartesian_planner_, planning_interface_);
 }
 
 // void

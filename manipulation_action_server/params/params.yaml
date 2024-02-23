@@ -1,5 +1,13 @@
 manipulation_action_server_executor:
   ros__parameters:
-    gripper_group: gripper
-    pose_open: open
+    ik_frame: gripper_grasping_frame
+    group: arm_torso
+    eef: gripper
     arm_group: arm_torso
+    gripper_group: gripper
+    open_pose: open
+    close_pose: close
+    joints_gripper: ['gripper_left_finger_joint', 'gripper_right_finger_joint']
+    gripper_closed: [0.0, 0.0]
+    gripper_tolerances: [0.01, 0.01]
+    

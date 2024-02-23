@@ -41,11 +41,11 @@ void ExecutePick(
     const std::shared_ptr<GoalHandlePick> goal_handle,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
-    std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner);
+    std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
+    moveit::planning_interface::PlanningSceneInterface psi);
 bool EvaluateJoint(
-    const std::map<std::string,
-    double>& desired_joint_values,
-    const double& tolerance,
+    const std::map<std::string, double>& desired_joint_values,
+    const std::vector<double>& tolerances,
     const rclcpp::Node::SharedPtr& node);
 
 moveit::task_constructor::Task ConfigureTask(const std::string& task_name, rclcpp::Node::SharedPtr node);
