@@ -94,7 +94,7 @@ moveit::task_constructor::Task MoveToPredefinedTask(
 
 moveit::task_constructor::Task PickTask(
   moveit_msgs::msg::CollisionObject object,
-  moveit::task_constructor::Stage** attach_object_stage,
+  moveit::task_constructor::Stage*& attach_object_stage,
   rclcpp::Node::SharedPtr node,
   std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
   std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
@@ -156,6 +156,8 @@ moveit::task_constructor::Task PickTask(
 
   // moveit::task_constructor::Stage* attach_object_stage =
   //     nullptr;  // Forward attach_object_stage to place pose generator
+
+  std::shared_ptr<moveit::task_constructor::Stage> attach_object_stage_ptr;
 
   // 3. Pick object
   RCLCPP_INFO(node->get_logger(), "3.- Pick object");
@@ -246,6 +248,7 @@ moveit::task_constructor::Task PickTask(
       auto stage = std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("attach_object");
       stage->attachObject(object.id, node->get_parameter("ik_frame").as_string());
       // *attach_object_stage = stage.get();
+      attach_object_stage = stage.get();
       grasp->insert(std::move(stage));
     }
 
@@ -391,7 +394,7 @@ moveit::task_constructor::Task PickAndPlaceTask(
     std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> sampling_planner,
     std::shared_ptr<moveit::planning_interface::PlanningSceneInterface> psi)
 {
-  moveit::task_constructor::Stage** attach_object_stage;
+  moveit::task_constructor::Stage* attach_object_stage;
 
   auto task = PickTask(
     object,
@@ -410,7 +413,7 @@ moveit::task_constructor::Task PickAndPlaceTask(
     cartesian_planner,
     sampling_planner,
     psi,
-    *attach_object_stage,
+    attach_object_stage,
     task);
   
   return task;

@@ -173,45 +173,14 @@ ManipulationServer::handle_move_to_predefined_accepted(
 {
   RCLCPP_INFO(this->get_logger(), "Goal accepted (move_to_predefined): %s", goal_handle->get_goal()->goal_pose.c_str());
 
-  task_thread_ = std::make_unique<std::thread>(
-        std::bind(&ManipulationServer::execute_move_to_predefined, this, std::placeholders::_1),
-        goal_handle
-  );
-  task_thread_->detach();
-  
-  // auto goal = <goal_handle->get_goal();
-  // auto result = std::make_shared<MoveToPredefined::Result>();
-  
-  // RCLCPP_INFO(get_logger(), "Setting group: %s", goal->group_name.c_str());
-  // RCLCPP_INFO(g>et_logger(), "Setting goal: %s", goal->goal_pose.c_str());
+  // task_thread_ = std::make_unique<std::thread>(
+  //       std::bind(&ManipulationServer::execute_move_to_predefined, this, std::placeholders::_1),
+  //       goal_handle
+  // );
+  // task_thread_->detach();
 
-
-  // std::future<moveit::task_constructor::Task> task_future = std::async(
-  //   std::launch::async, MoveToPredefinedTask,
-  //     goal->group_name,
-  //     goal->goal_pose,
-  //     node_,
-  //     interpolation_planner_);
-  
-  // task_future.wait();
-  // task_ = task_future.get();
-
-  // task_ = MoveToPredefinedTask(
-  //   goal->group_name,
-  //   goal->goal_pose,
-  //   node_,
-  //   interpolation_planner_);
-  
-  // if (SendTask(task_, node_)) {
-  //   RCLCPP_INFO(get_logger(), "Goal (move_to_predefined) succeeded");
-  //   result->success = true;
-  // } else {
-  //   RCLCPP_INFO(get_logger(), "Goal (move_to_predefined) failed");
-  //   result->success = false;
-  // }
-  // task_.clear();
-  // goal_handle->succeed(result);
-
+  std::thread{std::bind(&ManipulationServer::execute_move_to_predefined, this, std::placeholders::_1),
+    goal_handle}.detach();
 }
 
 void
@@ -266,7 +235,7 @@ ManipulationServer::handle_pick_accepted(
 
   auto goal = goal_handle->get_goal();
   auto result = std::make_shared<Pick::Result>();
-  moveit::task_constructor::Stage** attach_object_stage;
+  moveit::task_constructor::Stage* attach_object_stage;
 
   task_ = PickTask(
     goal->object_goal,

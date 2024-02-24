@@ -97,7 +97,7 @@ private:
   rclcpp::Node::SharedPtr node_;
   rclcpp::executors::MultiThreadedExecutor executor_;
   std::unique_ptr<std::thread> node_thread_;
-  std::unique_ptr<std::thread> task_thread_;
+  // std::unique_ptr<std::thread> task_thread_;
 
   std::atomic<bool> should_exit_{false};
   bool has_picked_{false};

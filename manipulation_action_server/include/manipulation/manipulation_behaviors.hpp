@@ -48,7 +48,7 @@ moveit::task_constructor::Task MoveToPredefinedTask(
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner);
 moveit::task_constructor::Task PickTask(
     moveit_msgs::msg::CollisionObject object,
-    moveit::task_constructor::Stage** attach_object_stage,
+    moveit::task_constructor::Stage*& attach_object_stage,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
     std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
