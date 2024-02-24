@@ -9,5 +9,6 @@ manipulation_action_server_executor:
     close_pose: close
     joints_gripper: ['gripper_left_finger_joint', 'gripper_right_finger_joint']
     gripper_closed: [0.0, 0.0]
+    gripper_open: [0.04, 0.04]
     gripper_tolerances: [0.01, 0.01]
     

@@ -13,6 +13,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(action_msgs
     action/MoveToPredefined.action
     action/Pick.action
+    action/Place.action
 )
 
 # set(srv_files

@@ -25,7 +25,6 @@ set(dependencies
     ament_index_cpp
     moveit_task_constructor_core
     manipulation_interfaces
-    # backward_ros
     rclcpp_cascade_lifecycle
 )
 
@@ -34,7 +33,6 @@ include
 )
 add_library(manipulation_server SHARED
   src/manipulation/ManipulationServer.cpp 
-  # src/manipulation/MTCNode.cpp
   src/manipulation/manipulation_behaviors.cpp
 )
 ament_target_dependencies(manipulation_server ${dependencies})

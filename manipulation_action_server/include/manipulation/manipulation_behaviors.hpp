@@ -13,6 +13,7 @@
 #include <moveit/task_constructor/stages.h>
 #include "manipulation_interfaces/action/move_to_predefined.hpp"
 #include "manipulation_interfaces/action/pick.hpp"
+#include "manipulation_interfaces/action/place.hpp"
 #if __has_include(<tf2_geometry_msgs/tf2_geometry_msgs.hpp>)
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #else
@@ -33,20 +34,33 @@ using GoalHandleMoveToPredefined = rclcpp_action::ServerGoalHandle<MoveToPredefi
 using Pick = manipulation_interfaces::action::Pick;
 using GoalHandlePick = rclcpp_action::ServerGoalHandle<Pick>;
 
+using Place = manipulation_interfaces::action::Place;
+using GoalHandlePlace = rclcpp_action::ServerGoalHandle<Place>;
+
 void ExecuteMoveToPredefined(
     const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner);
-void ExecutePick(
+moveit::task_constructor::Stage* ExecutePick(
     const std::shared_ptr<GoalHandlePick> goal_handle,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
     std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
-    moveit::planning_interface::PlanningSceneInterface psi);
+    moveit::planning_interface::PlanningSceneInterface psi,
+    std::shared_ptr<moveit::task_constructor::Task> task);
+void ExecutePlace(
+    const std::shared_ptr<GoalHandlePlace> goal_handle,
+    rclcpp::Node::SharedPtr node,
+    std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
+    std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
+    std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> sampling_planner,
+    moveit::planning_interface::PlanningSceneInterface psi,
+    moveit::task_constructor::Stage *attach_object_stage,
+    std::shared_ptr<moveit::task_constructor::Task> task);
 bool EvaluateJoint(
     const std::map<std::string, double>& desired_joint_values,
-    const std::vector<double>& tolerances,
-    const rclcpp::Node::SharedPtr& node);
+    const std::vector<double>& tolerances);
+
 
 moveit::task_constructor::Task ConfigureTask(const std::string& task_name, rclcpp::Node::SharedPtr node);
 
