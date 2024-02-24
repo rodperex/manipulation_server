@@ -27,7 +27,7 @@ moveit::task_constructor::Task ConfigureTask(const std::string& task_name, rclcp
   return task;
 }
 
-bool SendTask(moveit::task_constructor::Task& task, rclcpp::Node::SharedPtr node)
+bool ExecuteTask(moveit::task_constructor::Task& task, rclcpp::Node::SharedPtr node)
 {
   try {
     task.init();
@@ -247,7 +247,6 @@ moveit::task_constructor::Task PickTask(
       RCLCPP_INFO(node->get_logger(), "\t3.5.- Attach object");
       auto stage = std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("attach_object");
       stage->attachObject(object.id, node->get_parameter("ik_frame").as_string());
-      // *attach_object_stage = stage.get();
       attach_object_stage = stage.get();
       grasp->insert(std::move(stage));
     }
@@ -276,7 +275,7 @@ moveit::task_constructor::Task PickTask(
   return task;
 }
 
-void PlaceTask(
+void PlaceAfterPickTask(
     moveit_msgs::msg::CollisionObject object,
     geometry_msgs::msg::Pose place_pose,
     rclcpp::Node::SharedPtr node,
@@ -289,9 +288,6 @@ void PlaceTask(
 {
   RCLCPP_INFO_STREAM(node->get_logger(), "Executing place");
   
-
-  // auto task = ConfigureTask("place_task", node);
-
   std::string arm_group =
     node->get_parameter("arm_group").as_string();
   std::string gripper_group =
@@ -394,18 +390,17 @@ moveit::task_constructor::Task PickAndPlaceTask(
     std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> sampling_planner,
     std::shared_ptr<moveit::planning_interface::PlanningSceneInterface> psi)
 {
-  moveit::task_constructor::Stage* attach_object_stage;
+  moveit::task_constructor::Stage* attach_object_stage_ptr;
 
   auto task = PickTask(
     object,
-    attach_object_stage,  
+    attach_object_stage_ptr,  
     node,
     interpolation_planner,
     cartesian_planner,
     psi);
   
-
-  PlaceTask(
+  PlaceAfterPickTask(
     object,
     place_pose,
     node,
@@ -413,12 +408,43 @@ moveit::task_constructor::Task PickAndPlaceTask(
     cartesian_planner,
     sampling_planner,
     psi,
-    attach_object_stage,
+    attach_object_stage_ptr,
     task);
   
   return task;
 }
 
+moveit::task_constructor::Task PlaceTask(
+    moveit_msgs::msg::CollisionObject object,
+    geometry_msgs::msg::Pose place_pose,
+    rclcpp::Node::SharedPtr node,
+    std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
+    std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
+    std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> sampling_planner,
+    std::shared_ptr<moveit::planning_interface::PlanningSceneInterface> psi)
+{
+  moveit::task_constructor::Task task;
+  moveit::task_constructor::Stage* attach_object_stage_ptr;
+  
+  auto stage = std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("attach_object");
+  stage->attachObject(object.id, node->get_parameter("ik_frame").as_string());
+  attach_object_stage_ptr = stage.get();
+  task.add(std::move(stage));
+
+  PlaceAfterPickTask(
+    object,
+    place_pose,
+    node,
+    interpolation_planner,
+    cartesian_planner,
+    sampling_planner,
+    psi,
+    attach_object_stage_ptr,
+    task);
+  
+  return task;
+
+}
 bool IsGripperClosed(rclcpp::Node::SharedPtr node)
 {
   std::map<std::string, double> desired_joint_values;  

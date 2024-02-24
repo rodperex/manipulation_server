@@ -46,6 +46,7 @@ moveit::task_constructor::Task MoveToPredefinedTask(
     std::string goal_pose,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner);
+
 moveit::task_constructor::Task PickTask(
     moveit_msgs::msg::CollisionObject object,
     moveit::task_constructor::Stage*& attach_object_stage,
@@ -53,6 +54,16 @@ moveit::task_constructor::Task PickTask(
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
     std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
     std::shared_ptr<moveit::planning_interface::PlanningSceneInterface> psi);
+
+moveit::task_constructor::Task PlaceTask(
+    moveit_msgs::msg::CollisionObject object,
+    geometry_msgs::msg::Pose place_pose,
+    rclcpp::Node::SharedPtr node,
+    std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
+    std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
+    std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> sampling_planner,
+    std::shared_ptr<moveit::planning_interface::PlanningSceneInterface> psi);
+
 moveit::task_constructor::Task PickAndPlaceTask(
     moveit_msgs::msg::CollisionObject object,
     geometry_msgs::msg::Pose place_pose,
@@ -61,12 +72,15 @@ moveit::task_constructor::Task PickAndPlaceTask(
     std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
     std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> sampling_planner,
     std::shared_ptr<moveit::planning_interface::PlanningSceneInterface> psi);
+
 bool EvaluateJoint(
     const std::map<std::string, double>& desired_joint_values,
     const std::vector<double>& tolerances);
-bool SendTask(
+
+bool ExecuteTask(
     moveit::task_constructor::Task& task,
     rclcpp::Node::SharedPtr node);
+
 bool IsGripperClosed(rclcpp::Node::SharedPtr node);
 
 } // end namespace manipulation

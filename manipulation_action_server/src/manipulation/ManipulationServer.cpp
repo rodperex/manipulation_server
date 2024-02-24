@@ -204,7 +204,7 @@ ManipulationServer::execute_move_to_predefined(
   feedback->msg = "Executing task...";
   goal_handle->publish_feedback(feedback);
 
-  if (SendTask(task_, node_)) {
+  if (ExecuteTask(task_, node_)) {
     feedback->msg = "Task executed successfully";
     goal_handle->publish_feedback(feedback);
     RCLCPP_INFO(get_logger(), "Goal (move_to_predefined) succeeded");
@@ -245,7 +245,7 @@ ManipulationServer::handle_pick_accepted(
     cartesian_planner_,
     planning_interface_);
 
-  if (SendTask(task_, node_)) {
+  if (ExecuteTask(task_, node_)) {
     // If the gripper is closed, the object has not been picked
     if (IsGripperClosed(node_)) {
       RCLCPP_INFO(get_logger(), "Goal (pick) was executed, but the object is not in the gripper");
@@ -290,7 +290,7 @@ ManipulationServer::handle_pick_and_place_accepted(
     sampling_planner_,
     planning_interface_);
 
-  if (SendTask(task_, node_)) {
+  if (ExecuteTask(task_, node_)) {
     RCLCPP_INFO(get_logger(), "Goal (pick_and_place) succeeded");
     result->success = true;
   } else {
