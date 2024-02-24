@@ -5,6 +5,7 @@ find_package(ament_cmake REQUIRED)
 # find_package(builtin_interfaces REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(moveit_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 # find_package(sensor_msgs REQUIRED)
 # find_package(geometry_msgs REQUIRED)
 
@@ -14,6 +15,7 @@ set(action_msgs
     action/MoveToPredefined.action
     action/Pick.action
     action/Place.action
+    action/PickAndPlace.action
 )
 
 # set(srv_files

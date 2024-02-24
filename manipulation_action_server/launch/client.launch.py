@@ -10,21 +10,21 @@ import yaml
 
 def generate_launch_description():
 
-    pkg_dir = get_package_share_directory('action_server')
+    pkg_dir = get_package_share_directory('manipulation_action_server')
 
-    params_file = os.path.join(pkg_dir, 'params', 'params.yaml')
-    with open(params_file, 'r') as f:
-        params = yaml.safe_load(f)['action_server']['ros__parameters']
+    # params_file = os.path.join(pkg_dir, 'params', 'params.yaml')
+    # with open(params_file, 'r') as f:
+    #     params = yaml.safe_load(f)['manipulation_action_server']['ros__parameters']
 
     ld = LaunchDescription()
 
     robot_cmd = Node(
-        package='action_server',
+        package='manipulation_action_server',
         executable='client',
         output='screen',
         parameters=[{
             'use_sim_time': False,
-        }, params]
+        }]
     )
 
     ld.add_action(robot_cmd)

@@ -14,6 +14,7 @@
 #include "manipulation_interfaces/action/move_to_predefined.hpp"
 #include "manipulation_interfaces/action/pick.hpp"
 #include "manipulation_interfaces/action/place.hpp"
+#include "manipulation_interfaces/action/pick_and_place.hpp"
 #if __has_include(<tf2_geometry_msgs/tf2_geometry_msgs.hpp>)
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #else
@@ -37,32 +38,36 @@ using GoalHandlePick = rclcpp_action::ServerGoalHandle<Pick>;
 using Place = manipulation_interfaces::action::Place;
 using GoalHandlePlace = rclcpp_action::ServerGoalHandle<Place>;
 
-void ExecuteMoveToPredefined(
-    const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle,
+using PickAndPlace = manipulation_interfaces::action::PickAndPlace;
+using GoalHandlePickAndPlace = rclcpp_action::ServerGoalHandle<PickAndPlace>;
+
+moveit::task_constructor::Task MoveToPredefinedTask(
+    std::string group_name,
+    std::string goal_pose,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner);
-moveit::task_constructor::Stage* ExecutePick(
-    const std::shared_ptr<GoalHandlePick> goal_handle,
+moveit::task_constructor::Task PickTask(
+    moveit_msgs::msg::CollisionObject object,
+    moveit::task_constructor::Stage** attach_object_stage,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
     std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
-    moveit::planning_interface::PlanningSceneInterface psi,
-    std::shared_ptr<moveit::task_constructor::Task> task);
-void ExecutePlace(
-    const std::shared_ptr<GoalHandlePlace> goal_handle,
+    std::shared_ptr<moveit::planning_interface::PlanningSceneInterface> psi);
+moveit::task_constructor::Task PickAndPlaceTask(
+    moveit_msgs::msg::CollisionObject object,
+    geometry_msgs::msg::Pose place_pose,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
     std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
     std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> sampling_planner,
-    moveit::planning_interface::PlanningSceneInterface psi,
-    moveit::task_constructor::Stage *attach_object_stage,
-    std::shared_ptr<moveit::task_constructor::Task> task);
+    std::shared_ptr<moveit::planning_interface::PlanningSceneInterface> psi);
 bool EvaluateJoint(
     const std::map<std::string, double>& desired_joint_values,
     const std::vector<double>& tolerances);
-
-
-moveit::task_constructor::Task ConfigureTask(const std::string& task_name, rclcpp::Node::SharedPtr node);
+bool SendTask(
+    moveit::task_constructor::Task& task,
+    rclcpp::Node::SharedPtr node);
+bool IsGripperClosed(rclcpp::Node::SharedPtr node);
 
 } // end namespace manipulation
 

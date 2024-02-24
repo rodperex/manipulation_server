@@ -24,7 +24,7 @@ CallbackReturn
 ManipulationServer::on_configure(const rclcpp_lifecycle::State & state)
 {
   // this is for GETTING parameters (todo)
-  RCLCPP_INFO(get_logger(), "Configuring manipulation server");
+  RCLCPP_INFO(get_logger(), "Configuring manipulation server...");
   action_server_predefined_ = rclcpp_action::create_server<MoveToPredefined>(
     this,
     "move_to_predefined",
@@ -43,15 +43,14 @@ ManipulationServer::on_configure(const rclcpp_lifecycle::State & state)
     std::bind(&ManipulationServer::handle_pick_accepted, this, std::placeholders::_1)
   );
 
+  planning_interface_ = std::make_shared<moveit::planning_interface::PlanningSceneInterface>();
+
   interpolation_planner_ =
     std::make_shared<moveit::task_constructor::solvers::JointInterpolationPlanner>();
   // change the name to be a parameter
   // task_.stages()->setName("demo task");
   // task_.loadRobotModel(node_);
   // task_.setProperty("ik_frame", "<gr>ipper_grasping_frame");
-
-  // task_ = ConfigureTask("manipulation_task", node_);
-  *task_ = ConfigureTask("manipulation_task", node_);
 
   cartesian_planner_ =
     std::make_shared<moveit::task_constructor::solvers::CartesianPath>();
@@ -72,12 +71,7 @@ ManipulationServer::on_configure(const rclcpp_lifecycle::State & state)
       executor_.remove_node(node_);
     });
 
-  // Why?
-  // stage_state_current_ =
-  //   std::make_unique<moveit::task_constructor::stages::CurrentState>("current");
-  // current_state_ptr_ = stage_state_current_.get();
-
-
+  RCLCPP_INFO(get_logger(), "Manipulation server configured");
   return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
 }
 
@@ -136,12 +130,12 @@ ManipulationServer::handle_pick_goal(
 }
 
 rclcpp_action::GoalResponse
-ManipulationServer::handle_place_goal(
+ManipulationServer::handle_pick_and_place_goal(
   const rclcpp_action::GoalUUID & uuid,
-  std::shared_ptr<const manipulation_interfaces::action::Place::Goal> goal)
+  std::shared_ptr<const manipulation_interfaces::action::PickAndPlace::Goal> goal)
 {
 
-  RCLCPP_INFO(this->get_logger(), "Received goal: place %s", goal->attached_object.id.c_str());
+  RCLCPP_INFO(this->get_logger(), "Received goal: pick_and_place %s", goal->object.id.c_str());
   (void)uuid;
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
@@ -165,10 +159,10 @@ ManipulationServer::handle_pick_cancel(
 }
 
 rclcpp_action::CancelResponse
-ManipulationServer::handle_place_cancel(
-  const std::shared_ptr<rclcpp_action::ServerGoalHandle<manipulation_interfaces::action::Place>> goal_handle)
+ManipulationServer::handle_pick_and_place_cancel(
+  const std::shared_ptr<rclcpp_action::ServerGoalHandle<manipulation_interfaces::action::PickAndPlace>> goal_handle)
 {
-  RCLCPP_INFO(this->get_logger(), "Canceling goal: place");
+  RCLCPP_INFO(this->get_logger(), "Canceling goal: pick_and_place");
   (void)goal_handle;
   return rclcpp_action::CancelResponse::ACCEPT;
 }
@@ -179,13 +173,81 @@ ManipulationServer::handle_move_to_predefined_accepted(
 {
   RCLCPP_INFO(this->get_logger(), "Goal accepted (move_to_predefined): %s", goal_handle->get_goal()->goal_pose.c_str());
 
-  // task_thread_ = std::make_unique<std::thread>(
-  //       std::bind(&ManipulationServer::execute_move_to_predefined, this, std::placeholders::_1),
-  //       goal_handle
-  // );
-  // task_thread_->detach();
-  ExecuteMoveToPredefined(goal_handle, node_, interpolation_planner_);
+  task_thread_ = std::make_unique<std::thread>(
+        std::bind(&ManipulationServer::execute_move_to_predefined, this, std::placeholders::_1),
+        goal_handle
+  );
+  task_thread_->detach();
+  
+  // auto goal = <goal_handle->get_goal();
+  // auto result = std::make_shared<MoveToPredefined::Result>();
+  
+  // RCLCPP_INFO(get_logger(), "Setting group: %s", goal->group_name.c_str());
+  // RCLCPP_INFO(g>et_logger(), "Setting goal: %s", goal->goal_pose.c_str());
 
+
+  // std::future<moveit::task_constructor::Task> task_future = std::async(
+  //   std::launch::async, MoveToPredefinedTask,
+  //     goal->group_name,
+  //     goal->goal_pose,
+  //     node_,
+  //     interpolation_planner_);
+  
+  // task_future.wait();
+  // task_ = task_future.get();
+
+  // task_ = MoveToPredefinedTask(
+  //   goal->group_name,
+  //   goal->goal_pose,
+  //   node_,
+  //   interpolation_planner_);
+  
+  // if (SendTask(task_, node_)) {
+  //   RCLCPP_INFO(get_logger(), "Goal (move_to_predefined) succeeded");
+  //   result->success = true;
+  // } else {
+  //   RCLCPP_INFO(get_logger(), "Goal (move_to_predefined) failed");
+  //   result->success = false;
+  // }
+  // task_.clear();
+  // goal_handle->succeed(result);
+
+}
+
+void
+ManipulationServer::execute_move_to_predefined(
+  const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle)
+{
+  RCLCPP_INFO(this->get_logger(), "Executing goal (move_to_predefined): %s", goal_handle->get_goal()->goal_pose.c_str());
+  auto goal = goal_handle->get_goal();
+  auto result = std::make_shared<MoveToPredefined::Result>();
+  auto feedback = std::make_shared<MoveToPredefined::Feedback>();
+
+  feedback->msg = "Creating task...";
+  goal_handle->publish_feedback(feedback);
+  
+  task_ = MoveToPredefinedTask(
+    goal->group_name,
+    goal->goal_pose,
+    node_,
+    interpolation_planner_);
+
+  feedback->msg = "Executing task...";
+  goal_handle->publish_feedback(feedback);
+
+  if (SendTask(task_, node_)) {
+    feedback->msg = "Task executed successfully";
+    goal_handle->publish_feedback(feedback);
+    RCLCPP_INFO(get_logger(), "Goal (move_to_predefined) succeeded");
+    result->success = true;
+  } else {
+    feedback->msg = "Task failed";
+    goal_handle->publish_feedback(feedback);
+    RCLCPP_INFO(get_logger(), "Goal (move_to_predefined) failed");
+    result->success = false;
+  }
+  task_.clear();
+  goal_handle->succeed(result);
 }
 
 void
@@ -194,29 +256,82 @@ ManipulationServer::handle_pick_accepted(
 {
   RCLCPP_INFO(this->get_logger(), "Goal accepted (pick): %s", goal_handle->get_goal()->object_goal.id.c_str());
 
-  attach_object_stage_ptr_ = 
-    ExecutePick(goal_handle,
-      node_,
-      interpolation_planner_,
-      cartesian_planner_,
-      planning_interface_,
-      task_);
+  // attach_object_stage_ptr_ = 
+  //   ExecutePick(goal_handle,
+  //     node_,
+  //     interpolation_planner_,
+  //     cartesian_planner_,
+  //     planning_interface_,
+  //     task_);
+
+  auto goal = goal_handle->get_goal();
+  auto result = std::make_shared<Pick::Result>();
+  moveit::task_constructor::Stage** attach_object_stage;
+
+  task_ = PickTask(
+    goal->object_goal,
+    attach_object_stage,
+    node_,
+    interpolation_planner_,
+    cartesian_planner_,
+    planning_interface_);
+
+  if (SendTask(task_, node_)) {
+    // If the gripper is closed, the object has not been picked
+    if (IsGripperClosed(node_)) {
+      RCLCPP_INFO(get_logger(), "Goal (pick) was executed, but the object is not in the gripper");
+      result->success = false;
+      has_picked_ = false;
+    } else {
+      RCLCPP_INFO(get_logger(), "Goal (pick) succeeded");
+      result->success = true;
+      has_picked_ = true;
+    }
+  } else {
+    RCLCPP_INFO(get_logger(), "Goal (pick) failed");
+    result->success = false;
+  }
+  task_.clear();
+  goal_handle->succeed(result);
+  
+  // if (attach_object_stage_ptr_ != nullptr) {
+  //   has_picked_ = true;
+  // }
 }
 
 void
-ManipulationServer::handle_place_accepted(
-  const std::shared_ptr<GoalHandlePlace> goal_handle)
+ManipulationServer::handle_pick_and_place_accepted(
+  const std::shared_ptr<GoalHandlePickAndPlace> goal_handle)
 {
-  RCLCPP_INFO(this->get_logger(), "Goal accepted (place): %s", goal_handle->get_goal()->attached_object.id.c_str());
+  RCLCPP_INFO(this->get_logger(), "Goal accepted (pick_and_place): %s", goal_handle->get_goal()->object.id.c_str());
 
-  ExecutePlace(goal_handle,
+  if (!has_picked_) {
+    RCLCPP_WARN(this->get_logger(), "No object has been picked yet");
+  }
+
+  auto goal = goal_handle->get_goal();
+  auto result = std::make_shared<PickAndPlace::Result>();
+
+  task_ = PickAndPlaceTask(
+    goal->object,
+    goal->place_pose,
     node_,
     interpolation_planner_,
     cartesian_planner_,
     sampling_planner_,
-    planning_interface_,
-    attach_object_stage_ptr_,
-    task_);
+    planning_interface_);
+
+  if (SendTask(task_, node_)) {
+    RCLCPP_INFO(get_logger(), "Goal (pick_and_place) succeeded");
+    result->success = true;
+  } else {
+    RCLCPP_INFO(get_logger(), "Goal (pick_and_place) failed");
+    result->success = false;
+  }
+
+  has_picked_ = false;
+  task_.clear();
+  goal_handle->succeed(result);
 }
 
 } // namespace manipulation

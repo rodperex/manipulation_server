@@ -12,14 +12,17 @@ using namespace std::chrono_literals;
 
 moveit::task_constructor::Task ConfigureTask(const std::string& task_name, rclcpp::Node::SharedPtr node)
 {
-  moveit::task_constructor::Task task;
 
+  moveit::task_constructor::Task task;
+  
   task.stages()->setName(task_name);
   task.loadRobotModel(node);
 
   task.setProperty("ik_frame", node->get_parameter("ik_frame").as_string());
   task.setProperty("group", node->get_parameter("group").as_string());
   task.setProperty("eef", node->get_parameter("eef").as_string());
+
+  RCLCPP_INFO(node->get_logger(), "Task %s configured", task_name.c_str());
 
   return task;
 }
@@ -51,30 +54,28 @@ bool SendTask(moveit::task_constructor::Task& task, rclcpp::Node::SharedPtr node
       return false;
     }
     RCLCPP_INFO_STREAM(node->get_logger(), "Task execution succeeded");
-    task.clear();
+    // The task may continue later, so we shouldn't clear it
+    // But...what happents when it is executed in a later stacke (ie. place after pick)
+    // We should probably remove all stages that have been executed
+    // But it seems it is not possible
+    // task.clear();
     return true;
   } else {
     RCLCPP_ERROR_STREAM(node->get_logger(), "No solutions found");
-    task.clear();
+    // task.clear();
     return false;
   }  
 }
 
-void ExecuteMoveToPredefined(
-  const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle,
+moveit::task_constructor::Task MoveToPredefinedTask(
+  std::string group_name,
+  std::string goal_pose,
   rclcpp::Node::SharedPtr node,
   std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner)
 {
   RCLCPP_INFO(node->get_logger(), "Executing goal");
 
-  auto result = std::make_shared<MoveToPredefined::Result>();
-  result->success = false;
-  auto goal = goal_handle->get_goal();
-
   auto task = ConfigureTask("move_to_predefined_task", node);
-
-  RCLCPP_INFO(node->get_logger(), "Setting group: %s", goal->group_name.c_str());
-  RCLCPP_INFO(node->get_logger(), "Setting goal: %s", goal->goal_pose.c_str());
 
   auto stage_state_current = std::make_unique<moveit::task_constructor::stages::CurrentState>(
     "current");
@@ -84,58 +85,51 @@ void ExecuteMoveToPredefined(
     std::make_unique<moveit::task_constructor::stages::MoveTo>(
     "predefined",
     interpolation_planner);
-  stage_move_to_predefined->setGroup(goal->group_name);
-  stage_move_to_predefined->setGoal(goal->goal_pose);
+  stage_move_to_predefined->setGroup(group_name);
+  stage_move_to_predefined->setGoal(goal_pose);
   task.add(std::move(stage_move_to_predefined));
 
-  if (!SendTask(task, node))
-  {
-    result->success = false;   
-    goal_handle->succeed(result);
-    return;
-  }
-  else
-  {
-    RCLCPP_INFO(node->get_logger(), "Goal succeeded");
-    result->success = true;
-    goal_handle->succeed(result);
-  }
+  return task;
 }
 
-moveit::task_constructor::Stage* ExecutePick(
-  const std::shared_ptr<GoalHandlePick> goal_handle,
+moveit::task_constructor::Task PickTask(
+  moveit_msgs::msg::CollisionObject object,
+  moveit::task_constructor::Stage** attach_object_stage,
   rclcpp::Node::SharedPtr node,
   std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
   std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
-  moveit::planning_interface::PlanningSceneInterface psi,
-  std::shared_ptr<moveit::task_constructor::Task> task)
+  std::shared_ptr<moveit::planning_interface::PlanningSceneInterface> psi)
 {
   RCLCPP_INFO_STREAM(node->get_logger(), "Executing pick");
   
   auto result = std::make_shared<Pick::Result>();
-  auto goal = goal_handle->get_goal();
-  auto object = goal->object_goal;
+  // auto goal = goal_handle->get_goal();
+  // auto object = goal->object_goal;
 
-  // auto task = ConfigureTask("pick_task", node);
+  auto task = ConfigureTask("pick_task", node);
+  std::cout << "H O L I"<< std::endl;
 
-  psi.applyCollisionObject(object);
+  std::cout << "Object id: " << object.id << std::endl;
+
+  psi->applyCollisionObject(object);
 
   moveit::task_constructor::Stage* current_state_ptr = nullptr;
   auto stage_state_current = std::make_unique<moveit::task_constructor::stages::CurrentState>(
     "current");
   current_state_ptr = stage_state_current.get();
-  task->add(std::move(stage_state_current));
+  task.add(std::move(stage_state_current));
 
   std::string arm_group =
     node->get_parameter("arm_group").as_string();
   std::string gripper_group =
     node->get_parameter("gripper_group").as_string();
   std::string open_pose =
-    node->get_parameter("pose_open").as_string();
+    node->get_parameter("open_pose").as_string();
   std::string close_pose =
-    node->get_parameter("pose_close").as_string();
+    node->get_parameter("close_pose").as_string();
   
   // 1. Open gripper
+  RCLCPP_INFO(node->get_logger(), "1.- Open gripper");
   auto stage_open_gripper =
     std::make_unique<moveit::task_constructor::stages::MoveTo>(
     "open_gripper",
@@ -143,9 +137,12 @@ moveit::task_constructor::Stage* ExecutePick(
   
   stage_open_gripper->setGroup(gripper_group);
   stage_open_gripper->setGoal(open_pose);
-  task->add(std::move(stage_open_gripper));
+  task.add(std::move(stage_open_gripper));
+
+
 
   // 2. Move to pick
+  RCLCPP_INFO(node->get_logger(), "2.- Move to pick");
   auto stage_move_to_pick = std::make_unique<moveit::task_constructor::stages::Connect>(
       "move_to_pick",
       moveit::task_constructor::stages::Connect::GroupPlannerVector{
@@ -154,21 +151,24 @@ moveit::task_constructor::Stage* ExecutePick(
 
   stage_move_to_pick->setTimeout(3.0);
   stage_move_to_pick->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT);
-  task->add(std::move(stage_move_to_pick));
+  task.add(std::move(stage_move_to_pick));
+  RCLCPP_INFO(node->get_logger(), "Move to pick stage added");
 
-  moveit::task_constructor::Stage* attach_object_stage =
-      nullptr;  // Forward attach_object_stage to place pose generator
+  // moveit::task_constructor::Stage* attach_object_stage =
+  //     nullptr;  // Forward attach_object_stage to place pose generator
 
-  // 2. Pick object
+  // 3. Pick object
+  RCLCPP_INFO(node->get_logger(), "3.- Pick object");
   {
     auto grasp = std::make_unique<moveit::task_constructor::SerialContainer>("pick object");
-    task->properties().exposeTo(grasp->properties(), { "eef", "group", "ik_frame" });
+    task.properties().exposeTo(grasp->properties(), { "eef", "group", "ik_frame" });
     // clang-format off
     grasp->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT,
                                           { "eef", "group", "ik_frame" });
 
     {
       // 3.1. Approach object
+      RCLCPP_INFO(node->get_logger(), "\t3.1.- Approach object");
       auto stage =
           std::make_unique<moveit::task_constructor::stages::MoveRelative>
           ("approach_object", cartesian_planner);
@@ -187,6 +187,7 @@ moveit::task_constructor::Stage* ExecutePick(
     }
     {
       // 3.2. Generate grasp pose
+      RCLCPP_INFO(node->get_logger(), "\t3.2.- Generate grasp pose");
       auto stage = std::make_unique<moveit::task_constructor::stages::GenerateGraspPose>("generate_grasp_pose");
       stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT);
       stage->properties().set("marker_ns", "grasp_pose");
@@ -218,10 +219,11 @@ moveit::task_constructor::Stage* ExecutePick(
 
     {
       // 3.3. Allow collisions with the object so it can be grasped
+      RCLCPP_INFO(node->get_logger(), "\t3.3.- Allow collisions");
       auto stage =
           std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("allow_collision");
       stage->allowCollisions(object.id,
-                            task->getRobotModel()
+                            task.getRobotModel()
                             ->getJointModelGroup(node->get_parameter("eef").as_string())
                             ->getLinkModelNamesWithCollisionGeometry(),
                             true);
@@ -231,6 +233,7 @@ moveit::task_constructor::Stage* ExecutePick(
 
     {
       // 3.4. Close gripper
+      RCLCPP_INFO(node->get_logger(), "\t3.4.- Close gripper");
       auto stage = std::make_unique<moveit::task_constructor::stages::MoveTo>("close_hand", interpolation_planner);
       stage->setGroup(node->get_parameter("eef").as_string());
       stage->setGoal(close_pose);
@@ -239,14 +242,16 @@ moveit::task_constructor::Stage* ExecutePick(
 
     {
       // 3.5. Attach object
+      RCLCPP_INFO(node->get_logger(), "\t3.5.- Attach object");
       auto stage = std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("attach_object");
       stage->attachObject(object.id, node->get_parameter("ik_frame").as_string());
-      attach_object_stage = stage.get();
+      // *attach_object_stage = stage.get();
       grasp->insert(std::move(stage));
     }
 
     {
       // 3.6. Lift object
+      RCLCPP_INFO(node->get_logger(), "\t3.6.- Lift object");
       auto stage =
           std::make_unique<moveit::task_constructor::stages::MoveRelative>("lift_object", cartesian_planner);
       stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, { "group" });
@@ -261,71 +266,28 @@ moveit::task_constructor::Stage* ExecutePick(
       stage->setDirection(vec);
       grasp->insert(std::move(stage));
     }
-    task->add(std::move(grasp));
-  }
-  {
-    // 4. Clear task
-    // auto stage = std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("clear");
-    // stage->removeObject(object.id); // should't we keep it in the scene?
-    // task->add(std::move(stage));
+    RCLCPP_INFO(node->get_logger(), "pick added");
+    task.add(std::move(grasp));
   }
 
-  if (!SendTask(*task, node)) {
-    result->success = false;   
-    goal_handle->succeed(result);
-    return nullptr;
-  } else { 
-    std::map<std::string, double> desired_joint_values;  
-    std::vector<std::string> gripper_joints;
-    std::vector<double> gripper_tolerances, gripper_closed;
-
-    node->get_parameter("gripper_joints", gripper_joints);
-    node->get_parameter("gripper_tolerances", gripper_tolerances);
-    node->get_parameter("gripper_closed", gripper_closed);
-
-    if ((gripper_joints.size() != gripper_tolerances.size()) ||
-        (gripper_joints.size() != gripper_closed.size())) {
-      result->success = false;
-      goal_handle->succeed(result);
-    }
-    for (size_t i = 0; i < gripper_joints.size(); i++) {
-      RCLCPP_INFO(node->get_logger(), "Goal failed: impossible to get desired gripper joints values");
-      desired_joint_values[gripper_joints[i]] = gripper_closed[i];
-    }
-
-    if (!EvaluateJoint(desired_joint_values, gripper_tolerances)) {
-      RCLCPP_INFO(node->get_logger(), "Goal succeeded");
-      result->success = true;
-      goal_handle->succeed(result);
-    } else {
-      RCLCPP_ERROR(node->get_logger(), "Goal failed:: gripper joints are not within tolerance");
-      result->success = false;
-      goal_handle->succeed(result);
-    }
-  }
-  return attach_object_stage; 
+  return task;
 }
 
-void ExecutePlace(
-    const std::shared_ptr<GoalHandlePlace> goal_handle,
+void PlaceTask(
+    moveit_msgs::msg::CollisionObject object,
+    geometry_msgs::msg::Pose place_pose,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
     std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
     std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> sampling_planner,
-    moveit::planning_interface::PlanningSceneInterface psi,
+    std::shared_ptr<moveit::planning_interface::PlanningSceneInterface> psi,
     moveit::task_constructor::Stage *attach_object_stage,
-    std::shared_ptr<moveit::task_constructor::Task> task)
+    moveit::task_constructor::Task& task)
 {
-  RCLCPP_INFO_STREAM(node->get_logger(), "Executing pick");
+  RCLCPP_INFO_STREAM(node->get_logger(), "Executing place");
   
-  auto result = std::make_shared<Place::Result>();
-  auto goal = goal_handle->get_goal();
-  auto object = goal->attached_object;
 
-  // I think the task should be a class attribute so can be later used
   // auto task = ConfigureTask("place_task", node);
-
-  psi.applyCollisionObject(object);
 
   std::string arm_group =
     node->get_parameter("arm_group").as_string();
@@ -337,17 +299,17 @@ void ExecutePlace(
     node->get_parameter("pose_close").as_string();
 
   auto stage_move_to_place = std::make_unique<moveit::task_constructor::stages::Connect>(
-    "move to place",
+    "move_to_place",
     moveit::task_constructor::stages::Connect::GroupPlannerVector{
       { arm_group, sampling_planner },
       { gripper_group, sampling_planner }
     });
   stage_move_to_place->setTimeout(5.0);
   stage_move_to_place->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT);
-  task->add(std::move(stage_move_to_place));
+  task.add(std::move(stage_move_to_place));
   {
     auto place = std::make_unique<moveit::task_constructor::SerialContainer>("place_object");
-    task->properties().exposeTo(place->properties(), { "eef", "group", "ik_frame" });
+    task.properties().exposeTo(place->properties(), { "eef", "group", "ik_frame" });
     place->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT,
                                           { "eef", "group", "ik_frame" });
     {
@@ -357,12 +319,12 @@ void ExecutePlace(
       stage->properties().set("marker_ns", "place_pose");
       stage->setObject("object");
 
-      geometry_msgs::msg::PoseStamped target_pose_msg; // Where the object should be placed
+      // Reference frame?
+      geometry_msgs::msg::PoseStamped target_pose_msg;
+      target_pose_msg.header.stamp = node->now();
       target_pose_msg.header.frame_id = "object";
-      target_pose_msg.pose.position.y = 0.5; // param
-      target_pose_msg.pose.orientation.w = 1.0; // param
+      target_pose_msg.pose = place_pose;
       stage->setPose(target_pose_msg);
-      // This is not going to work since the pointed object has been deleted (the scope is the function) 
       stage->setMonitoredStage(attach_object_stage);  // Hook into attach_object_stage. This allows 
                                                       // the stage to know how the object is attached
 
@@ -388,7 +350,7 @@ void ExecutePlace(
       auto stage =
           std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("forbid_collision");
       stage->allowCollisions("object",
-                            task->getRobotModel()
+                            task.getRobotModel()
                                 ->getJointModelGroup(gripper_group)
                                 ->getLinkModelNamesWithCollisionGeometry(),
                             false);
@@ -415,45 +377,66 @@ void ExecutePlace(
       stage->setDirection(vec);
       place->insert(std::move(stage));
     }
-    task->add(std::move(place));
+    task.add(std::move(place));
   }
 
-  if (!SendTask(*task, node)) {
-    result->success = false;   
-    goal_handle->succeed(result);
-    return;
-  } else { 
-    std::map<std::string, double> desired_joint_values;  
-    std::vector<std::string> gripper_joints;
-    std::vector<double> gripper_tolerances, gripper_open;
-
-    node->get_parameter("gripper_joints", gripper_joints);
-    node->get_parameter("gripper_tolerances", gripper_tolerances);
-    node->get_parameter("gripper_open", gripper_open);
-
-    if ((gripper_joints.size() != gripper_tolerances.size()) ||
-        (gripper_joints.size() != gripper_open.size())) {
-      result->success = false;
-      goal_handle->succeed(result);
-    }
-    for (size_t i = 0; i < gripper_joints.size(); i++) {
-      RCLCPP_INFO(node->get_logger(), "Goal failed: impossible to get desired gripper joints values");
-      desired_joint_values[gripper_joints[i]] = gripper_open[i];
-    }
-
-    if (!EvaluateJoint(desired_joint_values, gripper_tolerances)) {
-      RCLCPP_INFO(node->get_logger(), "Goal succeeded");
-      result->success = true;
-      goal_handle->succeed(result);
-    } else {
-      RCLCPP_ERROR(node->get_logger(), "Goal failed:: gripper joints are not within tolerance");
-      result->success = false;
-      goal_handle->succeed(result);
-    }
-  }
-  // After the place is done, we could probably clear the task
 }
 
+moveit::task_constructor::Task PickAndPlaceTask(
+    moveit_msgs::msg::CollisionObject object,
+    geometry_msgs::msg::Pose place_pose,
+    rclcpp::Node::SharedPtr node,
+    std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
+    std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
+    std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> sampling_planner,
+    std::shared_ptr<moveit::planning_interface::PlanningSceneInterface> psi)
+{
+  moveit::task_constructor::Stage** attach_object_stage;
+
+  auto task = PickTask(
+    object,
+    attach_object_stage,  
+    node,
+    interpolation_planner,
+    cartesian_planner,
+    psi);
+  
+
+  PlaceTask(
+    object,
+    place_pose,
+    node,
+    interpolation_planner,
+    cartesian_planner,
+    sampling_planner,
+    psi,
+    *attach_object_stage,
+    task);
+  
+  return task;
+}
+
+bool IsGripperClosed(rclcpp::Node::SharedPtr node)
+{
+  std::map<std::string, double> desired_joint_values;  
+  std::vector<std::string> gripper_joints;
+  std::vector<double> gripper_tolerances, gripper_closed;
+
+  node->get_parameter("gripper_joints", gripper_joints);
+  node->get_parameter("gripper_tolerances", gripper_tolerances);
+  node->get_parameter("gripper_closed", gripper_closed);
+
+  if ((gripper_joints.size() != gripper_tolerances.size()) ||
+      (gripper_joints.size() != gripper_closed.size())) {
+    RCLCPP_INFO(node->get_logger(), "Impossible to get desired gripper joints values");
+    return false;
+  }
+  for (size_t i = 0; i < gripper_joints.size(); i++) {
+    desired_joint_values[gripper_joints[i]] = gripper_closed[i];
+  }
+
+  return EvaluateJoint(desired_joint_values, gripper_tolerances);
+}
 bool EvaluateJoint(const std::map<std::string, double>& desired_joint_values,
   const std::vector<double>& tolerances)
 {
@@ -496,4 +479,6 @@ bool EvaluateJoint(const std::map<std::string, double>& desired_joint_values,
   }
   return are_joints_values_within_tolerance;
 }
+
+
 } // end namespace manipulation

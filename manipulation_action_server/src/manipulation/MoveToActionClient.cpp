@@ -7,18 +7,18 @@ MoveToPredefinedActionClient::MoveToPredefinedActionClient()
 : Node("moveto_action_client")
 {
   this->action_client_ = rclcpp_action::create_client<MoveToPredefined>(
-    this, "move_robot_to_predefined");
+    this, "move_to_predefined");
 
   auto goal_msg = manipulation_interfaces::action::MoveToPredefined_Goal();
 
-  declare_parameter("group_name", "hand");
+  declare_parameter("group_name", "gripper");
   declare_parameter("goal_pose", "open");
 
   get_parameter("group_name", goal_msg.group_name);
   get_parameter("goal_pose", goal_msg.goal_pose);
 
   RCLCPP_INFO(
-    get_logger(), "Sending goal to move robot arm (%s) to pose %s",
+    get_logger(), "Sending goal to move <%s> to pose <%s>",
     goal_msg.group_name.c_str(), goal_msg.goal_pose.c_str());
 
   send_goal(goal_msg);

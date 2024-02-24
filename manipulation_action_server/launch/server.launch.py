@@ -16,7 +16,7 @@ def generate_launch_description():
 
     ld = LaunchDescription()
 
-    pkg_dir = get_package_share_directory('action_server')
+    pkg_dir = get_package_share_directory('manipulation_action_server')
 
     params_file = os.path.join(
         pkg_dir,
@@ -67,7 +67,7 @@ def generate_launch_description():
     }
 
     server_cmd = Node(
-        package='action_server',
+        package='manipulation_action_server',
         executable='server',
         output='screen',
         parameters=[
