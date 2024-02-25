@@ -3,6 +3,9 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <thread>
+#include <algorithm>
+#include <vector>
+
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 #include "lifecycle_msgs/msg/state.hpp"
 
@@ -20,9 +23,6 @@
 #include <moveit/task_constructor/task.h>
 #include <moveit/task_constructor/solvers.h>
 #include <moveit/task_constructor/stages.h>
-
-#include "manipulation/MTCNode.hpp"
-
 
 namespace manipulation
 {
@@ -53,33 +53,63 @@ public:
 private:
   void execute_move_to_predefined(
     const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle);
+  void execute_move_to(
+    const std::shared_ptr<GoalHandleMoveTo> goal_handle);
+  void execute_pick(
+    const std::shared_ptr<GoalHandlePick> goal_handle);
+  void execute_pick_and_place(
+    const std::shared_ptr<GoalHandlePickAndPlace> goal_handle);
+  void execute_place(
+    const std::shared_ptr<GoalHandlePlace> goal_handle);
 
-  rclcpp_action::Server<MoveToPredefined>::SharedPtr action_server_predefined_;
-  rclcpp_action::Server<Pick>::SharedPtr action_server_pick_;
-
+  rclcpp_action::Server<MoveToPredefined>::SharedPtr
+    action_server_move_to_predefined_;
+  rclcpp_action::Server<MoveTo>::SharedPtr
+    action_server_move_to_;
+  rclcpp_action::Server<Pick>::SharedPtr
+    action_server_pick_;
+  rclcpp_action::Server<PickAndPlace>::SharedPtr
+    action_server_pick_and_place_;
+  rclcpp_action::Server<Place>::SharedPtr
+    action_server_place_;
+  
   rclcpp_action::GoalResponse handle_move_to_predefined_goal(
     const rclcpp_action::GoalUUID & uuid,
     std::shared_ptr<const MoveToPredefined::Goal> goal);
+  rclcpp_action::GoalResponse handle_move_to_goal(
+    const rclcpp_action::GoalUUID & uuid,
+    std::shared_ptr<const MoveTo::Goal> goal);
   rclcpp_action::GoalResponse handle_pick_goal(
     const rclcpp_action::GoalUUID & uuid,
     std::shared_ptr<const Pick::Goal> goal);
   rclcpp_action::GoalResponse handle_pick_and_place_goal(
     const rclcpp_action::GoalUUID & uuid,
-    std::shared_ptr<const PickAndPlace::Goal> goal);  
+    std::shared_ptr<const PickAndPlace::Goal> goal);
+  rclcpp_action::GoalResponse handle_place_goal(
+    const rclcpp_action::GoalUUID & uuid,
+    std::shared_ptr<const Place::Goal> goal);  
 
   rclcpp_action::CancelResponse handle_move_to_predefined_cancel(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<MoveToPredefined>> goal_handle);
+  rclcpp_action::CancelResponse handle_move_to_cancel(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<MoveTo>> goal_handle);
   rclcpp_action::CancelResponse handle_pick_cancel(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<Pick>> goal_handle);
   rclcpp_action::CancelResponse handle_pick_and_place_cancel(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<PickAndPlace>> goal_handle);
+  rclcpp_action::CancelResponse handle_place_cancel(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<Place>> goal_handle);
 
   void handle_move_to_predefined_accepted(
     const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle);
+  void handle_move_to_accepted(
+    const std::shared_ptr<GoalHandleMoveTo> goal_handle);
   void handle_pick_accepted(
     const std::shared_ptr<GoalHandlePick> goal_handle);
   void handle_pick_and_place_accepted(
     const std::shared_ptr<GoalHandlePickAndPlace> goal_handle);
+  void handle_place_accepted(
+    const std::shared_ptr<GoalHandlePlace> goal_handle);
 
   moveit::task_constructor::Task task_;
   

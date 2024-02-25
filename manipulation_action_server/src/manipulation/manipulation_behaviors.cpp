@@ -1,9 +1,4 @@
 #include "manipulation/manipulation_behaviors.hpp"
-#include <map>
-#include <moveit_msgs/srv/get_planning_scene.hpp>
-#include <algorithm>
-#include <chrono>
-
 
 namespace manipulation
 {
@@ -54,10 +49,6 @@ bool ExecuteTask(moveit::task_constructor::Task& task, rclcpp::Node::SharedPtr n
       return false;
     }
     RCLCPP_INFO_STREAM(node->get_logger(), "Task execution succeeded");
-    // The task may continue later, so we shouldn't clear it
-    // But...what happents when it is executed in a later stacke (ie. place after pick)
-    // We should probably remove all stages that have been executed
-    // But it seems it is not possible
     // task.clear();
     return true;
   } else {
@@ -445,6 +436,7 @@ moveit::task_constructor::Task PlaceTask(
   return task;
 
 }
+
 bool IsGripperClosed(rclcpp::Node::SharedPtr node)
 {
   std::map<std::string, double> desired_joint_values;  

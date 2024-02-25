@@ -1,0 +1,9 @@
+# Request
+string group_name
+geometry_msgs/Vector3 goal_pose
+---
+# Result
+bool success
+---
+# Feedback
+string msg
