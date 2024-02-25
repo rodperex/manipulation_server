@@ -11,16 +11,11 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(action_msgs
     action/MoveToPredefined.action
-    action/MoveTo.action
+    action/MoveGroup.action
     action/Pick.action
     action/Place.action
     action/PickAndPlace.action
 )
-
-# set(srv_files
-#   srv/Srv1.srv
-#   srv/Srv2.srv
-# )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
     ${action_msgs}

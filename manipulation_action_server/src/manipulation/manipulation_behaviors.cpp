@@ -83,6 +83,42 @@ moveit::task_constructor::Task MoveToPredefinedTask(
   return task;
 }
 
+moveit::task_constructor::Task MoveGroupTask(
+  std::string group_name,
+  geometry_msgs::msg::Twist goal_pose,
+  rclcpp::Node::SharedPtr node,
+  std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner)
+{
+  RCLCPP_INFO(node->get_logger(), "Executing goal");
+
+  auto task = ConfigureTask("move_group_task", node);
+
+  {
+    auto stage = std::make_unique<moveit::task_constructor::stages::CurrentState>(
+      "current");
+    task.add(std::move(stage));
+  }
+  {
+    auto stage =
+        std::make_unique<moveit::task_constructor::stages::MoveRelative>
+        ("move_relative", interpolation_planner);
+
+    stage->properties().set("marker_ns", "move_relative");
+    stage->properties().set("link", group_name);
+    stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, { "group" });
+    stage->setMinMaxDistance(0.0, 0.15);
+
+
+    geometry_msgs::msg::TwistStamped twist;
+    twist.twist = goal_pose;
+    twist.header.frame_id = group_name;
+    stage->setDirection(twist);
+    task.add(std::move(stage));
+  }
+
+  return task;
+}
+
 moveit::task_constructor::Task PickTask(
   moveit_msgs::msg::CollisionObject object,
   moveit::task_constructor::Stage*& attach_object_stage,
@@ -94,13 +130,8 @@ moveit::task_constructor::Task PickTask(
   RCLCPP_INFO_STREAM(node->get_logger(), "Executing pick");
   
   auto result = std::make_shared<Pick::Result>();
-  // auto goal = goal_handle->get_goal();
-  // auto object = goal->object_goal;
-
+  
   auto task = ConfigureTask("pick_task", node);
-  std::cout << "H O L I"<< std::endl;
-
-  std::cout << "Object id: " << object.id << std::endl;
 
   psi->applyCollisionObject(object);
 
@@ -153,7 +184,7 @@ moveit::task_constructor::Task PickTask(
   // 3. Pick object
   RCLCPP_INFO(node->get_logger(), "3.- Pick object");
   {
-    auto grasp = std::make_unique<moveit::task_constructor::SerialContainer>("pick object");
+    auto grasp = std::make_unique<moveit::task_constructor::SerialContainer>("pick_object");
     task.properties().exposeTo(grasp->properties(), { "eef", "group", "ik_frame" });
     // clang-format off
     grasp->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT,

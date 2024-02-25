@@ -34,6 +34,16 @@ ManipulationServer::on_configure(const rclcpp_lifecycle::State & state)
     std::bind(&ManipulationServer::handle_move_to_predefined_accepted, this, std::placeholders::_1)
   );
 
+  action_server_move_group_ = rclcpp_action::create_server<MoveGroup>(
+    this,
+    "move_group",
+    std::bind(
+      &ManipulationServer::handle_move_group_goal, this, std::placeholders::_1,
+      std::placeholders::_2),
+    std::bind(&ManipulationServer::handle_move_group_cancel, this, std::placeholders::_1),
+    std::bind(&ManipulationServer::handle_move_group_accepted, this, std::placeholders::_1)
+  );
+
   action_server_pick_ = rclcpp_action::create_server<Pick>(
     this,
     "pick",
@@ -134,6 +144,17 @@ ManipulationServer::handle_move_to_predefined_goal(
 }
 
 rclcpp_action::GoalResponse
+ManipulationServer::handle_move_group_goal(
+  const rclcpp_action::GoalUUID & uuid,
+  std::shared_ptr<const manipulation_interfaces::action::MoveGroup::Goal> goal)
+{
+
+  RCLCPP_INFO(this->get_logger(), "Received goal: move group %s", goal->group_name.c_str());
+  (void)uuid;
+  return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+}
+
+rclcpp_action::GoalResponse
 ManipulationServer::handle_pick_goal(
   const rclcpp_action::GoalUUID & uuid,
   std::shared_ptr<const manipulation_interfaces::action::Pick::Goal> goal)
@@ -175,6 +196,14 @@ ManipulationServer::handle_move_to_predefined_cancel(
   return rclcpp_action::CancelResponse::ACCEPT;
 }
 
+rclcpp_action::CancelResponse
+ManipulationServer::handle_move_group_cancel(
+  const std::shared_ptr<rclcpp_action::ServerGoalHandle<manipulation_interfaces::action::MoveGroup>> goal_handle)
+{
+  RCLCPP_INFO(this->get_logger(), "Canceling goal: move group");
+  (void)goal_handle;
+  return rclcpp_action::CancelResponse::ACCEPT;
+}
 
 rclcpp_action::CancelResponse
 ManipulationServer::handle_pick_cancel(
@@ -210,7 +239,8 @@ void
 ManipulationServer::handle_move_to_predefined_accepted(
   const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle)
 {
-  RCLCPP_INFO(this->get_logger(), "Goal accepted (move_to_predefined): %s", goal_handle->get_goal()->goal_pose.c_str());
+  RCLCPP_INFO(this->get_logger(), "Goal accepted (move_to_predefined): %s",
+    goal_handle->get_goal()->goal_pose.c_str());
 
   // task_thread_ = std::make_unique<std::thread>(
   //       std::bind(&ManipulationServer::execute_move_to_predefined, this, std::placeholders::_1),
@@ -223,10 +253,23 @@ ManipulationServer::handle_move_to_predefined_accepted(
 }
 
 void
+ManipulationServer::handle_move_group_accepted(
+  const std::shared_ptr<GoalHandleMoveGroup> goal_handle)
+{
+  RCLCPP_INFO(this->get_logger(), "Goal accepted (move_group): %s",
+    goal_handle->get_goal()->group_name.c_str());
+
+  std::thread{std::bind(&ManipulationServer::execute_move_group, this, std::placeholders::_1),
+    goal_handle}.detach();
+}
+
+void
 ManipulationServer::execute_move_to_predefined(
   const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle)
 {
-  RCLCPP_INFO(this->get_logger(), "Executing goal (move_to_predefined): %s", goal_handle->get_goal()->goal_pose.c_str());
+  RCLCPP_INFO(this->get_logger(), "Executing goal (move_to_predefined): %s",
+    goal_handle->get_goal()->goal_pose.c_str());
+
   auto goal = goal_handle->get_goal();
   auto result = std::make_shared<MoveToPredefined::Result>();
   auto feedback = std::make_shared<MoveToPredefined::Feedback>();
@@ -252,6 +295,44 @@ ManipulationServer::execute_move_to_predefined(
     feedback->msg = "Task failed";
     goal_handle->publish_feedback(feedback);
     RCLCPP_INFO(get_logger(), "Goal (move_to_predefined) failed");
+    result->success = false;
+  }
+  task_.clear();
+  goal_handle->succeed(result);
+}
+
+void
+ManipulationServer::execute_move_group(
+  const std::shared_ptr<GoalHandleMoveGroup> goal_handle)
+{
+  RCLCPP_INFO(this->get_logger(), "Executing goal (move_group): %s",
+    goal_handle->get_goal()->group_name.c_str());
+
+  auto goal = goal_handle->get_goal();
+  auto result = std::make_shared<MoveGroup::Result>();
+  auto feedback = std::make_shared<MoveGroup::Feedback>();
+
+  feedback->msg = "Creating task...";
+  goal_handle->publish_feedback(feedback);
+  
+  task_ = MoveGroupTask(
+    goal->group_name,
+    goal->goal_pose,
+    node_,
+    interpolation_planner_);
+
+  feedback->msg = "Executing task...";
+  goal_handle->publish_feedback(feedback);
+
+  if (ExecuteTask(task_, node_)) {
+    feedback->msg = "Task executed successfully";
+    goal_handle->publish_feedback(feedback);
+    RCLCPP_INFO(get_logger(), "Goal (move_group) succeeded");
+    result->success = true;
+  } else {
+    feedback->msg = "Task failed";
+    goal_handle->publish_feedback(feedback);
+    RCLCPP_INFO(get_logger(), "Goal (move_group) failed");
     result->success = false;
   }
   task_.clear();

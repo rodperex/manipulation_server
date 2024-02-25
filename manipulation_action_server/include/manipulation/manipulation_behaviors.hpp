@@ -15,7 +15,7 @@
 #include <moveit/task_constructor/solvers.h>
 #include <moveit/task_constructor/stages.h>
 #include "manipulation_interfaces/action/move_to_predefined.hpp"
-#include "manipulation_interfaces/action/move_to.hpp"
+#include "manipulation_interfaces/action/move_group.hpp"
 #include "manipulation_interfaces/action/pick.hpp"
 #include "manipulation_interfaces/action/place.hpp"
 #include "manipulation_interfaces/action/pick_and_place.hpp"
@@ -36,8 +36,8 @@ namespace manipulation
 using MoveToPredefined = manipulation_interfaces::action::MoveToPredefined;
 using GoalHandleMoveToPredefined = rclcpp_action::ServerGoalHandle<MoveToPredefined>;
 
-using MoveTo = manipulation_interfaces::action::MoveTo;
-using GoalHandleMoveTo = rclcpp_action::ServerGoalHandle<MoveTo>;
+using MoveGroup = manipulation_interfaces::action::MoveGroup;
+using GoalHandleMoveGroup = rclcpp_action::ServerGoalHandle<MoveGroup>;
 
 using Pick = manipulation_interfaces::action::Pick;
 using GoalHandlePick = rclcpp_action::ServerGoalHandle<Pick>;
@@ -55,9 +55,9 @@ moveit::task_constructor::Task MoveToPredefinedTask(
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
         interpolation_planner);
 
-moveit::task_constructor::Task MoveToTask(
+moveit::task_constructor::Task MoveGroupTask(
     std::string group_name,
-    geometry_msgs::msg::Vector3 goal_pose,
+    geometry_msgs::msg::Twist goal_pose,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
         interpolation_planner);

@@ -1,6 +1,6 @@
 # Request
 string group_name
-geometry_msgs/Vector3 goal_pose
+geometry_msgs/Twist goal_pose
 ---
 # Result
 bool success
