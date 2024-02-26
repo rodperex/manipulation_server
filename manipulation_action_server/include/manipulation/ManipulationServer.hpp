@@ -53,8 +53,8 @@ public:
 private:
   void execute_move_to_predefined(
     const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle);
-  void execute_move_group(
-    const std::shared_ptr<GoalHandleMoveGroup> goal_handle);
+  void execute_move_joint(
+    const std::shared_ptr<GoalHandleMoveJoint> goal_handle);
   void execute_pick(
     const std::shared_ptr<GoalHandlePick> goal_handle);
   void execute_pick_and_place(
@@ -64,8 +64,8 @@ private:
 
   rclcpp_action::Server<MoveToPredefined>::SharedPtr
     action_server_move_to_predefined_;
-  rclcpp_action::Server<MoveGroup>::SharedPtr
-    action_server_move_group_;
+  rclcpp_action::Server<MoveJoint>::SharedPtr
+    action_server_move_joint_;
   rclcpp_action::Server<Pick>::SharedPtr
     action_server_pick_;
   rclcpp_action::Server<PickAndPlace>::SharedPtr
@@ -76,9 +76,9 @@ private:
   rclcpp_action::GoalResponse handle_move_to_predefined_goal(
     const rclcpp_action::GoalUUID & uuid,
     std::shared_ptr<const MoveToPredefined::Goal> goal);
-  rclcpp_action::GoalResponse handle_move_group_goal(
+  rclcpp_action::GoalResponse handle_move_joint_goal(
     const rclcpp_action::GoalUUID & uuid,
-    std::shared_ptr<const MoveGroup::Goal> goal);
+    std::shared_ptr<const MoveJoint::Goal> goal);
   rclcpp_action::GoalResponse handle_pick_goal(
     const rclcpp_action::GoalUUID & uuid,
     std::shared_ptr<const Pick::Goal> goal);
@@ -91,8 +91,8 @@ private:
 
   rclcpp_action::CancelResponse handle_move_to_predefined_cancel(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<MoveToPredefined>> goal_handle);
-  rclcpp_action::CancelResponse handle_move_group_cancel(
-    const std::shared_ptr<rclcpp_action::ServerGoalHandle<MoveGroup>> goal_handle);
+  rclcpp_action::CancelResponse handle_move_joint_cancel(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<MoveJoint>> goal_handle);
   rclcpp_action::CancelResponse handle_pick_cancel(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<Pick>> goal_handle);
   rclcpp_action::CancelResponse handle_pick_and_place_cancel(
@@ -102,8 +102,8 @@ private:
 
   void handle_move_to_predefined_accepted(
     const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle);
-  void handle_move_group_accepted(
-    const std::shared_ptr<GoalHandleMoveGroup> goal_handle);
+  void handle_move_joint_accepted(
+    const std::shared_ptr<GoalHandleMoveJoint> goal_handle);
   void handle_pick_accepted(
     const std::shared_ptr<GoalHandlePick> goal_handle);
   void handle_pick_and_place_accepted(

@@ -1,6 +1,6 @@
 # Request
-string group_name
-geometry_msgs/Twist goal_pose
+string joint_name
+geometry_msgs/Pose goal_pose
 ---
 # Result
 bool success

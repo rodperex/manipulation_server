@@ -68,7 +68,8 @@ moveit::task_constructor::Task MoveToPredefinedTask(
 
   auto task = ConfigureTask("move_to_predefined_task", node);
 
-  auto stage_state_current = std::make_unique<moveit::task_constructor::stages::CurrentState>(
+  auto stage_state_current = std::make_unique<
+    moveit::task_constructor::stages::CurrentState>(
     "current");
   task.add(std::move(stage_state_current));
 
@@ -83,37 +84,54 @@ moveit::task_constructor::Task MoveToPredefinedTask(
   return task;
 }
 
-moveit::task_constructor::Task MoveGroupTask(
-  std::string group_name,
-  geometry_msgs::msg::Twist goal_pose,
+moveit::task_constructor::Task MoveJointTask(
+  std::string joint_name,
+  geometry_msgs::msg::Pose goal_pose,
   rclcpp::Node::SharedPtr node,
-  std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner)
+  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> interpolation_planner)
 {
   RCLCPP_INFO(node->get_logger(), "Executing goal");
 
   auto task = ConfigureTask("move_group_task", node);
 
   {
-    auto stage = std::make_unique<moveit::task_constructor::stages::CurrentState>(
+    auto stage = std::make_unique<
+      moveit::task_constructor::stages::CurrentState>(
       "current");
     task.add(std::move(stage));
   }
   {
     auto stage =
-        std::make_unique<moveit::task_constructor::stages::MoveRelative>
-        ("move_relative", interpolation_planner);
+        std::make_unique<moveit::task_constructor::stages::MoveTo>
+        ("move_group_to", interpolation_planner);
+    // stage->properties().set("marker_ns", "move_group_to");
+    // stage->properties().set("link", node->get_parameter("ik_frame"));
+    // stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, { "group" });
 
-    stage->properties().set("marker_ns", "move_relative");
-    stage->properties().set("link", group_name);
-    stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, { "group" });
-    stage->setMinMaxDistance(0.0, 0.15);
+    geometry_msgs::msg::PoseStamped pose;
+    pose.header.stamp = node->now();
+    pose.pose = goal_pose;
+    // pose.header.frame_id = (node->get_parameter("ik_frame")).as_string();
+    stage->setGroup(joint_name);
+    stage->setGoal(pose);
+    // task.add(std::move(stage));
 
-
-    geometry_msgs::msg::TwistStamped twist;
-    twist.twist = goal_pose;
-    twist.header.frame_id = group_name;
-    stage->setDirection(twist);
-    task.add(std::move(stage));
+    Eigen::Isometry3d tr;
+    Eigen::Quaterniond q = Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()) *
+                          Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
+                          Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitZ());
+    tr.linear() = q.matrix();
+    auto wrapper =
+      std::make_unique<moveit::task_constructor::stages::ComputeIK>("move_group_IK", std::move(stage));
+    wrapper->setMaxIKSolutions(8);
+    wrapper->setMinSolutionDistance(1.0);
+    wrapper->setIKFrame(tr, "gripper_grasping_frame");
+    // wrapper->setIKFrame(pose);
+    // wrapper->setTargetPose(pose);
+    wrapper->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, { "eef", "group" });
+    wrapper->properties().configureInitFrom(moveit::task_constructor::Stage::INTERFACE, { "target_pose" });
+    task.add(std::move(wrapper));
+    
   }
 
   return task;
@@ -448,6 +466,8 @@ moveit::task_constructor::Task PlaceTask(
   moveit::task_constructor::Task task;
   moveit::task_constructor::Stage* attach_object_stage_ptr;
   
+  // Get the attached object from the planning scene?
+
   auto stage = std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("attach_object");
   stage->attachObject(object.id, node->get_parameter("ik_frame").as_string());
   attach_object_stage_ptr = stage.get();

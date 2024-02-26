@@ -34,14 +34,14 @@ ManipulationServer::on_configure(const rclcpp_lifecycle::State & state)
     std::bind(&ManipulationServer::handle_move_to_predefined_accepted, this, std::placeholders::_1)
   );
 
-  action_server_move_group_ = rclcpp_action::create_server<MoveGroup>(
+  action_server_move_joint_ = rclcpp_action::create_server<MoveJoint>(
     this,
-    "move_group",
+    "move_joint",
     std::bind(
-      &ManipulationServer::handle_move_group_goal, this, std::placeholders::_1,
+      &ManipulationServer::handle_move_joint_goal, this, std::placeholders::_1,
       std::placeholders::_2),
-    std::bind(&ManipulationServer::handle_move_group_cancel, this, std::placeholders::_1),
-    std::bind(&ManipulationServer::handle_move_group_accepted, this, std::placeholders::_1)
+    std::bind(&ManipulationServer::handle_move_joint_cancel, this, std::placeholders::_1),
+    std::bind(&ManipulationServer::handle_move_joint_accepted, this, std::placeholders::_1)
   );
 
   action_server_pick_ = rclcpp_action::create_server<Pick>(
@@ -144,12 +144,12 @@ ManipulationServer::handle_move_to_predefined_goal(
 }
 
 rclcpp_action::GoalResponse
-ManipulationServer::handle_move_group_goal(
+ManipulationServer::handle_move_joint_goal(
   const rclcpp_action::GoalUUID & uuid,
-  std::shared_ptr<const manipulation_interfaces::action::MoveGroup::Goal> goal)
+  std::shared_ptr<const manipulation_interfaces::action::MoveJoint::Goal> goal)
 {
 
-  RCLCPP_INFO(this->get_logger(), "Received goal: move group %s", goal->group_name.c_str());
+  RCLCPP_INFO(this->get_logger(), "Received goal: move group %s", goal->joint_name.c_str());
   (void)uuid;
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
@@ -197,8 +197,8 @@ ManipulationServer::handle_move_to_predefined_cancel(
 }
 
 rclcpp_action::CancelResponse
-ManipulationServer::handle_move_group_cancel(
-  const std::shared_ptr<rclcpp_action::ServerGoalHandle<manipulation_interfaces::action::MoveGroup>> goal_handle)
+ManipulationServer::handle_move_joint_cancel(
+  const std::shared_ptr<rclcpp_action::ServerGoalHandle<manipulation_interfaces::action::MoveJoint>> goal_handle)
 {
   RCLCPP_INFO(this->get_logger(), "Canceling goal: move group");
   (void)goal_handle;
@@ -253,13 +253,13 @@ ManipulationServer::handle_move_to_predefined_accepted(
 }
 
 void
-ManipulationServer::handle_move_group_accepted(
-  const std::shared_ptr<GoalHandleMoveGroup> goal_handle)
+ManipulationServer::handle_move_joint_accepted(
+  const std::shared_ptr<GoalHandleMoveJoint> goal_handle)
 {
-  RCLCPP_INFO(this->get_logger(), "Goal accepted (move_group): %s",
-    goal_handle->get_goal()->group_name.c_str());
+  RCLCPP_INFO(this->get_logger(), "Goal accepted (move_joint): %s",
+    goal_handle->get_goal()->joint_name.c_str());
 
-  std::thread{std::bind(&ManipulationServer::execute_move_group, this, std::placeholders::_1),
+  std::thread{std::bind(&ManipulationServer::execute_move_joint, this, std::placeholders::_1),
     goal_handle}.detach();
 }
 
@@ -302,24 +302,24 @@ ManipulationServer::execute_move_to_predefined(
 }
 
 void
-ManipulationServer::execute_move_group(
-  const std::shared_ptr<GoalHandleMoveGroup> goal_handle)
+ManipulationServer::execute_move_joint(
+  const std::shared_ptr<GoalHandleMoveJoint> goal_handle)
 {
-  RCLCPP_INFO(this->get_logger(), "Executing goal (move_group): %s",
-    goal_handle->get_goal()->group_name.c_str());
+  RCLCPP_INFO(this->get_logger(), "Executing goal (move_joint): %s",
+    goal_handle->get_goal()->joint_name.c_str());
 
   auto goal = goal_handle->get_goal();
-  auto result = std::make_shared<MoveGroup::Result>();
-  auto feedback = std::make_shared<MoveGroup::Feedback>();
+  auto result = std::make_shared<MoveJoint::Result>();
+  auto feedback = std::make_shared<MoveJoint::Feedback>();
 
   feedback->msg = "Creating task...";
   goal_handle->publish_feedback(feedback);
   
-  task_ = MoveGroupTask(
-    goal->group_name,
+  task_ = MoveJointTask(
+    goal->joint_name,
     goal->goal_pose,
     node_,
-    interpolation_planner_);
+    cartesian_planner_);
 
   feedback->msg = "Executing task...";
   goal_handle->publish_feedback(feedback);
@@ -327,12 +327,12 @@ ManipulationServer::execute_move_group(
   if (ExecuteTask(task_, node_)) {
     feedback->msg = "Task executed successfully";
     goal_handle->publish_feedback(feedback);
-    RCLCPP_INFO(get_logger(), "Goal (move_group) succeeded");
+    RCLCPP_INFO(get_logger(), "Goal (move_joint) succeeded");
     result->success = true;
   } else {
     feedback->msg = "Task failed";
     goal_handle->publish_feedback(feedback);
-    RCLCPP_INFO(get_logger(), "Goal (move_group) failed");
+    RCLCPP_INFO(get_logger(), "Goal (move_joint) failed");
     result->success = false;
   }
   task_.clear();

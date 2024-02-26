@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(action_msgs
     action/MoveToPredefined.action
-    action/MoveGroup.action
+    action/MoveJoint.action
     action/Pick.action
     action/Place.action
     action/PickAndPlace.action
