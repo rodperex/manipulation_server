@@ -49,63 +49,63 @@ using PickAndPlace = manipulation_interfaces::action::PickAndPlace;
 using GoalHandlePickAndPlace = rclcpp_action::ServerGoalHandle<PickAndPlace>;
 
 moveit::task_constructor::Task MoveToPredefinedTask(
-    std::string group_name,
-    std::string goal_pose,
-    rclcpp::Node::SharedPtr node,
-    std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
-        interpolation_planner);
+  std::string group_name,
+  std::string goal_pose,
+  rclcpp::Node::SharedPtr node,
+  std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
+  interpolation_planner);
 
 moveit::task_constructor::Task MoveJointTask(
-    std::string joint_name,
-    double joint_value,
-    rclcpp::Node::SharedPtr node,
-    std::shared_ptr<moveit::task_constructor::solvers::CartesianPath>
-        interpolation_planner);
+  std::string joint_name,
+  double joint_value,
+  rclcpp::Node::SharedPtr node,
+  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath>
+  interpolation_planner);
 
 moveit::task_constructor::Task PickTask(
-    moveit_msgs::msg::CollisionObject object,
-    moveit::task_constructor::Stage*& attach_object_stage,
-    rclcpp::Node::SharedPtr node,
-    std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
-        interpolation_planner,
-    std::shared_ptr<moveit::task_constructor::solvers::CartesianPath>
-        cartesian_planner,
-    std::shared_ptr<moveit::planning_interface::PlanningSceneInterface>
-        psi);
+  moveit_msgs::msg::CollisionObject object,
+  moveit::task_constructor::Stage * & attach_object_stage,
+  rclcpp::Node::SharedPtr node,
+  std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
+  interpolation_planner,
+  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath>
+  cartesian_planner,
+  std::shared_ptr<moveit::planning_interface::PlanningSceneInterface>
+  psi);
 
 moveit::task_constructor::Task PlaceTask(
-    moveit_msgs::msg::CollisionObject object,
-    geometry_msgs::msg::PoseStamped place_pose,
-    rclcpp::Node::SharedPtr node,
-    std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
-        interpolation_planner,
-    std::shared_ptr<moveit::task_constructor::solvers::CartesianPath>
-        cartesian_planner,
-    std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner>
-        sampling_planner,
-    std::shared_ptr<moveit::planning_interface::PlanningSceneInterface>
-        psi);
+  moveit_msgs::msg::CollisionObject object,
+  geometry_msgs::msg::PoseStamped place_pose,
+  rclcpp::Node::SharedPtr node,
+  std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
+  interpolation_planner,
+  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath>
+  cartesian_planner,
+  std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner>
+  sampling_planner,
+  std::shared_ptr<moveit::planning_interface::PlanningSceneInterface>
+  psi);
 
 moveit::task_constructor::Task PickAndPlaceTask(
-    moveit_msgs::msg::CollisionObject object,
-    geometry_msgs::msg::PoseStamped place_pose,
-    rclcpp::Node::SharedPtr node,
-    std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
-        interpolation_planner,
-    std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> 
-        cartesian_planner,
-    std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner>
-        sampling_planner,
-    std::shared_ptr<moveit::planning_interface::PlanningSceneInterface>
-        psi);
+  moveit_msgs::msg::CollisionObject object,
+  geometry_msgs::msg::PoseStamped place_pose,
+  rclcpp::Node::SharedPtr node,
+  std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
+  interpolation_planner,
+  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath>
+  cartesian_planner,
+  std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner>
+  sampling_planner,
+  std::shared_ptr<moveit::planning_interface::PlanningSceneInterface>
+  psi);
 
 bool EvaluateJoint(
-    const std::map<std::string, double>& desired_joint_values,
-    const std::vector<double>& tolerances);
+  const std::map<std::string, double> & desired_joint_values,
+  const std::vector<double> & tolerances);
 
 bool ExecuteTask(
-    moveit::task_constructor::Task& task,
-    rclcpp::Node::SharedPtr node);
+  moveit::task_constructor::Task & task,
+  rclcpp::Node::SharedPtr node);
 
 bool IsGripperClosed(rclcpp::Node::SharedPtr node);
 

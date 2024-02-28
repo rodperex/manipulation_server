@@ -30,25 +30,24 @@ namespace manipulation
 using CallbackReturn =
   rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
-class ManipulationServer : public  rclcpp_cascade_lifecycle::CascadeLifecycleNode
+class ManipulationServer : public rclcpp_cascade_lifecycle::CascadeLifecycleNode
 {
 public:
-
   ManipulationServer(
     const rclcpp::NodeOptions & options = rclcpp::NodeOptions()
   );
   virtual ~ManipulationServer();
 
   CallbackReturn
-    on_configure(const rclcpp_lifecycle::State & state) override;
+  on_configure(const rclcpp_lifecycle::State & state) override;
   CallbackReturn
-    on_activate(const rclcpp_lifecycle::State & state) override;
+  on_activate(const rclcpp_lifecycle::State & state) override;
   CallbackReturn
-    on_deactivate(const rclcpp_lifecycle::State & state) override;
+  on_deactivate(const rclcpp_lifecycle::State & state) override;
   CallbackReturn
-    on_cleanup(const rclcpp_lifecycle::State & state) override;
+  on_cleanup(const rclcpp_lifecycle::State & state) override;
   CallbackReturn
-    on_shutdown(const rclcpp_lifecycle::State & state) override;
+  on_shutdown(const rclcpp_lifecycle::State & state) override;
 
 private:
   void execute_move_to_predefined(
@@ -72,7 +71,7 @@ private:
     action_server_pick_and_place_;
   rclcpp_action::Server<Place>::SharedPtr
     action_server_place_;
-  
+
   rclcpp_action::GoalResponse handle_move_to_predefined_goal(
     const rclcpp_action::GoalUUID & uuid,
     std::shared_ptr<const MoveToPredefined::Goal> goal);
@@ -87,7 +86,7 @@ private:
     std::shared_ptr<const PickAndPlace::Goal> goal);
   rclcpp_action::GoalResponse handle_place_goal(
     const rclcpp_action::GoalUUID & uuid,
-    std::shared_ptr<const Place::Goal> goal);  
+    std::shared_ptr<const Place::Goal> goal);
 
   rclcpp_action::CancelResponse handle_move_to_predefined_cancel(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<MoveToPredefined>> goal_handle);
@@ -112,13 +111,13 @@ private:
     const std::shared_ptr<GoalHandlePlace> goal_handle);
 
   moveit::task_constructor::Task task_;
-  
+
   std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
-    interpolation_planner_;
+  interpolation_planner_;
   std::shared_ptr<moveit::task_constructor::solvers::CartesianPath>
-    cartesian_planner_;
+  cartesian_planner_;
   std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner>
-    sampling_planner_;
+  sampling_planner_;
 
   // Not sure whether this should be a pointer or not (are we just connecting to moveit2?)
   std::shared_ptr<moveit::planning_interface::PlanningSceneInterface> planning_interface_;
