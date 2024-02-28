@@ -57,7 +57,7 @@ moveit::task_constructor::Task MoveToPredefinedTask(
 
 moveit::task_constructor::Task MoveJointTask(
     std::string joint_name,
-    geometry_msgs::msg::Pose goal_pose,
+    double joint_value,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::CartesianPath>
         interpolation_planner);
@@ -75,7 +75,7 @@ moveit::task_constructor::Task PickTask(
 
 moveit::task_constructor::Task PlaceTask(
     moveit_msgs::msg::CollisionObject object,
-    geometry_msgs::msg::Pose place_pose,
+    geometry_msgs::msg::PoseStamped place_pose,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
         interpolation_planner,
@@ -88,7 +88,7 @@ moveit::task_constructor::Task PlaceTask(
 
 moveit::task_constructor::Task PickAndPlaceTask(
     moveit_msgs::msg::CollisionObject object,
-    geometry_msgs::msg::Pose place_pose,
+    geometry_msgs::msg::PoseStamped place_pose,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
         interpolation_planner,

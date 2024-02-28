@@ -1,6 +1,6 @@
 # Request
 moveit_msgs/CollisionObject attached_object
-geometry_msgs/Pose place_pose
+geometry_msgs/PoseStamped place_pose
 
 # Is it better to use only the tf and then extract the collision from the tf ?
 ---

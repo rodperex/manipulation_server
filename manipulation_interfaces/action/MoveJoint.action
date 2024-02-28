@@ -1,6 +1,6 @@
 # Request
 string joint_name
-geometry_msgs/Pose goal_pose
+float32 joint_value
 ---
 # Result
 bool success

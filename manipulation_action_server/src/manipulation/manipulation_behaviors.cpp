@@ -86,13 +86,13 @@ moveit::task_constructor::Task MoveToPredefinedTask(
 
 moveit::task_constructor::Task MoveJointTask(
   std::string joint_name,
-  geometry_msgs::msg::Pose goal_pose,
+  double joint_value,
   rclcpp::Node::SharedPtr node,
   std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> interpolation_planner)
 {
   RCLCPP_INFO(node->get_logger(), "Executing goal");
 
-  auto task = ConfigureTask("move_group_task", node);
+  auto task = ConfigureTask("move_joint_task", node);
 
   {
     auto stage = std::make_unique<
@@ -103,35 +103,11 @@ moveit::task_constructor::Task MoveJointTask(
   {
     auto stage =
         std::make_unique<moveit::task_constructor::stages::MoveTo>
-        ("move_group_to", interpolation_planner);
-    // stage->properties().set("marker_ns", "move_group_to");
-    // stage->properties().set("link", node->get_parameter("ik_frame"));
-    // stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, { "group" });
+        ("move_joint_to", interpolation_planner);
+    stage->setGroup(node->get_parameter("group").as_string());
+    stage->setGoal(std::map<std::string, double>{ { joint_name, joint_value } }); 
 
-    geometry_msgs::msg::PoseStamped pose;
-    pose.header.stamp = node->now();
-    pose.pose = goal_pose;
-    // pose.header.frame_id = (node->get_parameter("ik_frame")).as_string();
-    stage->setGroup(joint_name);
-    stage->setGoal(pose);
-    // task.add(std::move(stage));
-
-    Eigen::Isometry3d tr;
-    Eigen::Quaterniond q = Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()) *
-                          Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
-                          Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitZ());
-    tr.linear() = q.matrix();
-    auto wrapper =
-      std::make_unique<moveit::task_constructor::stages::ComputeIK>("move_group_IK", std::move(stage));
-    wrapper->setMaxIKSolutions(8);
-    wrapper->setMinSolutionDistance(1.0);
-    wrapper->setIKFrame(tr, "gripper_grasping_frame");
-    // wrapper->setIKFrame(pose);
-    // wrapper->setTargetPose(pose);
-    wrapper->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, { "eef", "group" });
-    wrapper->properties().configureInitFrom(moveit::task_constructor::Stage::INTERFACE, { "target_pose" });
-    task.add(std::move(wrapper));
-    
+    task.add(std::move(stage));    
   }
 
   return task;
@@ -197,7 +173,7 @@ moveit::task_constructor::Task PickTask(
   // moveit::task_constructor::Stage* attach_object_stage =
   //     nullptr;  // Forward attach_object_stage to place pose generator
 
-  std::shared_ptr<moveit::task_constructor::Stage> attach_object_stage_ptr;
+  // std::shared_ptr<moveit::task_constructor::Stage> attach_object_stage_ptr;
 
   // 3. Pick object
   RCLCPP_INFO(node->get_logger(), "3.- Pick object");
@@ -317,7 +293,7 @@ moveit::task_constructor::Task PickTask(
 
 void PlaceAfterPickTask(
     moveit_msgs::msg::CollisionObject object,
-    geometry_msgs::msg::Pose place_pose,
+    geometry_msgs::msg::PoseStamped place_pose,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
     std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
@@ -333,9 +309,9 @@ void PlaceAfterPickTask(
   std::string gripper_group =
     node->get_parameter("gripper_group").as_string();
   std::string open_pose =
-    node->get_parameter("pose_open").as_string();
+    node->get_parameter("open_pose").as_string();
   std::string close_pose =
-    node->get_parameter("pose_close").as_string();
+    node->get_parameter("close_pose").as_string();
 
   auto stage_move_to_place = std::make_unique<moveit::task_constructor::stages::Connect>(
     "move_to_place",
@@ -356,14 +332,9 @@ void PlaceAfterPickTask(
       auto stage = std::make_unique<moveit::task_constructor::stages::GeneratePlacePose>("generate place pose");
       stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT);
       stage->properties().set("marker_ns", "place_pose");
-      stage->setObject("object");
+      stage->setObject(object.id);
 
-      // Reference frame?
-      geometry_msgs::msg::PoseStamped target_pose_msg;
-      target_pose_msg.header.stamp = node->now();
-      target_pose_msg.header.frame_id = "object";
-      target_pose_msg.pose = place_pose;
-      stage->setPose(target_pose_msg);
+      stage->setPose(place_pose);
       stage->setMonitoredStage(attach_object_stage);  // Hook into attach_object_stage. This allows 
                                                       // the stage to know how the object is attached
 
@@ -372,7 +343,7 @@ void PlaceAfterPickTask(
           std::make_unique<moveit::task_constructor::stages::ComputeIK>("place_pose_IK", std::move(stage));
       wrapper->setMaxIKSolutions(2);
       wrapper->setMinSolutionDistance(1.0);
-      wrapper->setIKFrame("object");
+      wrapper->setIKFrame(object.id);
       wrapper->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, { "eef", "group" });
       wrapper->properties().configureInitFrom(moveit::task_constructor::Stage::INTERFACE, { "target_pose" });
       place->insert(std::move(wrapper));
@@ -388,7 +359,7 @@ void PlaceAfterPickTask(
       // We no longer need to hold the object
       auto stage =
           std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("forbid_collision");
-      stage->allowCollisions("object",
+      stage->allowCollisions(object.id,
                             task.getRobotModel()
                                 ->getJointModelGroup(gripper_group)
                                 ->getLinkModelNamesWithCollisionGeometry(),
@@ -398,20 +369,20 @@ void PlaceAfterPickTask(
     {
       // Stage to detach the object from the hand
       auto stage = std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("detach_object");
-      stage->detachObject("object", node->get_parameter("ik_frame").as_string());
+      stage->detachObject(object.id, node->get_parameter("ik_frame").as_string());
       place->insert(std::move(stage));
     }
     {
       // Stage to retreat the hand from the object
       auto stage = std::make_unique<moveit::task_constructor::stages::MoveRelative>("retreat", cartesian_planner);
       stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, { "group" });
-      stage->setMinMaxDistance(0.1, 0.3);
+      stage->setMinMaxDistance(0.0, 0.15);
       stage->setIKFrame(node->get_parameter("ik_frame").as_string());
       stage->properties().set("marker_ns", "retreat");
 
       // Set retreat direction
       geometry_msgs::msg::Vector3Stamped vec;
-      vec.header.frame_id = "base_link"; 
+      vec.header.frame_id = node->get_parameter("ik_frame").as_string();
       vec.vector.x = -0.5;
       stage->setDirection(vec);
       place->insert(std::move(stage));
@@ -423,7 +394,7 @@ void PlaceAfterPickTask(
 
 moveit::task_constructor::Task PickAndPlaceTask(
     moveit_msgs::msg::CollisionObject object,
-    geometry_msgs::msg::Pose place_pose,
+    geometry_msgs::msg::PoseStamped place_pose,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
     std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
@@ -456,7 +427,7 @@ moveit::task_constructor::Task PickAndPlaceTask(
 
 moveit::task_constructor::Task PlaceTask(
     moveit_msgs::msg::CollisionObject object,
-    geometry_msgs::msg::Pose place_pose,
+    geometry_msgs::msg::PoseStamped place_pose,
     rclcpp::Node::SharedPtr node,
     std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner,
     std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner,
@@ -465,8 +436,15 @@ moveit::task_constructor::Task PlaceTask(
 {
   moveit::task_constructor::Task task;
   moveit::task_constructor::Stage* attach_object_stage_ptr;
+
+  task = ConfigureTask("place_task", node);
+
+  moveit::task_constructor::Stage* current_state_ptr = nullptr;
+  auto stage_state_current = std::make_unique<moveit::task_constructor::stages::CurrentState>(
+    "current");
   
-  // Get the attached object from the planning scene?
+  task.add(std::move(stage_state_current));
+  // attach_object_stage_ptr = stage_state_current.get();
 
   auto stage = std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("attach_object");
   stage->attachObject(object.id, node->get_parameter("ik_frame").as_string());
@@ -483,6 +461,94 @@ moveit::task_constructor::Task PlaceTask(
     psi,
     attach_object_stage_ptr,
     task);
+
+  // std::string arm_group =
+  //   node->get_parameter("arm_group").as_string();
+  // std::string gripper_group =
+  //   node->get_parameter("gripper_group").as_string();
+  // std::string open_pose =
+  //   node->get_parameter("open_pose").as_string();
+  // std::string close_pose =
+  //   node->get_parameter("close_pose").as_string();
+
+  // auto stage_move_to_place = std::make_unique<moveit::task_constructor::stages::Connect>(
+  //   "move_to_place",
+  //   moveit::task_constructor::stages::Connect::GroupPlannerVector{
+  //     { arm_group, sampling_planner },
+  //     { gripper_group, sampling_planner }
+  //   });
+  // stage_move_to_place->setTimeout(5.0);
+  // stage_move_to_place->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT);
+  // task.add(std::move(stage_move_to_place));
+  // {
+  //   auto place = std::make_unique<moveit::task_constructor::SerialContainer>("place_object");
+  //   task.properties().exposeTo(place->properties(), { "eef", "group", "ik_frame" });
+  //   place->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT,
+  //                                         { "eef", "group", "ik_frame" });
+  //   {
+  //     // Stage to generate the poses to place the object and compute the IK
+  //     auto stage = std::make_unique<moveit::task_constructor::stages::GeneratePlacePose>("generate place pose");
+  //     stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT);
+  //     stage->properties().set("marker_ns", "place_pose");
+  //     stage->setObject(object.id);
+
+  //     stage->setPose(place_pose);
+  //     stage->setMonitoredStage(attach_object_stage_ptr);  // Hook into attach_object_stage. This allows 
+  //                                                     // the stage to know how the object is attached
+
+  //     // Compute IK
+  //     auto wrapper =
+  //         std::make_unique<moveit::task_constructor::stages::ComputeIK>("place_pose_IK", std::move(stage));
+  //     wrapper->setMaxIKSolutions(2);
+  //     wrapper->setMinSolutionDistance(1.0);
+  //     wrapper->setIKFrame(object.id);
+  //     wrapper->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, { "eef", "group" });
+  //     wrapper->properties().configureInitFrom(moveit::task_constructor::Stage::INTERFACE, { "target_pose" });
+  //     place->insert(std::move(wrapper));
+  //   }
+  //   {
+  //     // Stage to detach the object from the hand
+  //     auto stage = std::make_unique<moveit::task_constructor::stages::MoveTo>(open_pose, interpolation_planner);
+  //     stage->setGroup(gripper_group);
+  //     stage->setGoal(open_pose);
+  //     place->insert(std::move(stage));
+  //   }
+  //   {
+  //     // We no longer need to hold the object
+  //     auto stage =
+  //         std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("forbid_collision");
+  //     stage->allowCollisions(object.id,
+  //                           task.getRobotModel()
+  //                               ->getJointModelGroup(gripper_group)
+  //                               ->getLinkModelNamesWithCollisionGeometry(),
+  //                           false);
+  //     place->insert(std::move(stage));
+  //   }
+  //   {
+  //     // Stage to detach the object from the hand
+  //     auto stage = std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>("detach_object");
+  //     stage->detachObject(object.id, node->get_parameter("ik_frame").as_string());
+  //     place->insert(std::move(stage));
+  //   }
+  //   {
+  //     // Stage to retreat the hand from the object
+  //     auto stage = std::make_unique<moveit::task_constructor::stages::MoveRelative>("retreat", cartesian_planner);
+  //     stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, { "group" });
+  //     stage->setMinMaxDistance(0.0, 0.15);
+  //     stage->setIKFrame(node->get_parameter("ik_frame").as_string());
+  //     stage->properties().set("marker_ns", "retreat");
+
+  //     // Set retreat direction
+  //     geometry_msgs::msg::Vector3Stamped vec;
+  //     vec.header.frame_id = node->get_parameter("ik_frame").as_string();
+  //     vec.vector.x = -0.5;
+  //     stage->setDirection(vec);
+  //     place->insert(std::move(stage));
+  //   }
+  //   task.add(std::move(place));
+  // }
+
+  
   
   return task;
 

@@ -62,7 +62,7 @@ ManipulationServer::on_configure(const rclcpp_lifecycle::State & state)
 
   action_server_place_ = rclcpp_action::create_server<Place>(
     this,
-    "pick_and_place",
+    "place",
     std::bind(&ManipulationServer::handle_place_goal, this, std::placeholders::_1, std::placeholders::_2),
     std::bind(&ManipulationServer::handle_place_cancel, this, std::placeholders::_1),
     std::bind(&ManipulationServer::handle_place_accepted, this, std::placeholders::_1)
@@ -317,7 +317,7 @@ ManipulationServer::execute_move_joint(
   
   task_ = MoveJointTask(
     goal->joint_name,
-    goal->goal_pose,
+    goal->joint_value,
     node_,
     cartesian_planner_);
 
