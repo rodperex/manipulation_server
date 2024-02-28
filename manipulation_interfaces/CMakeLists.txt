@@ -15,6 +15,7 @@ set(action_msgs
     action/Pick.action
     action/Place.action
     action/PickAndPlace.action
+    action/MoveEndEffector.action
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}

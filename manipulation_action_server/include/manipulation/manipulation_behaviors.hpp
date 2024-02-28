@@ -16,6 +16,7 @@
 #include <moveit/task_constructor/stages.h>
 #include "manipulation_interfaces/action/move_to_predefined.hpp"
 #include "manipulation_interfaces/action/move_joint.hpp"
+#include "manipulation_interfaces/action/move_end_effector.hpp"
 #include "manipulation_interfaces/action/pick.hpp"
 #include "manipulation_interfaces/action/place.hpp"
 #include "manipulation_interfaces/action/pick_and_place.hpp"
@@ -39,6 +40,9 @@ using GoalHandleMoveToPredefined = rclcpp_action::ServerGoalHandle<MoveToPredefi
 using MoveJoint = manipulation_interfaces::action::MoveJoint;
 using GoalHandleMoveJoint = rclcpp_action::ServerGoalHandle<MoveJoint>;
 
+using MoveEndEffector = manipulation_interfaces::action::MoveEndEffector;
+using GoalHandleMoveEndEffector = rclcpp_action::ServerGoalHandle<MoveEndEffector>;
+
 using Pick = manipulation_interfaces::action::Pick;
 using GoalHandlePick = rclcpp_action::ServerGoalHandle<Pick>;
 
@@ -48,21 +52,27 @@ using GoalHandlePlace = rclcpp_action::ServerGoalHandle<Place>;
 using PickAndPlace = manipulation_interfaces::action::PickAndPlace;
 using GoalHandlePickAndPlace = rclcpp_action::ServerGoalHandle<PickAndPlace>;
 
-moveit::task_constructor::Task MoveToPredefinedTask(
+moveit::task_constructor::Task move_to_predefined_task(
   std::string group_name,
   std::string goal_pose,
   rclcpp::Node::SharedPtr node,
   std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
   interpolation_planner);
 
-moveit::task_constructor::Task MoveJointTask(
+moveit::task_constructor::Task move_joint_task(
   std::string joint_name,
   double joint_value,
   rclcpp::Node::SharedPtr node,
   std::shared_ptr<moveit::task_constructor::solvers::CartesianPath>
-  interpolation_planner);
+  cartesian_planner);
 
-moveit::task_constructor::Task PickTask(
+moveit::task_constructor::Task move_end_effecto_task(
+  geometry_msgs::msg::TransformStamped eef2goal,
+  rclcpp::Node::SharedPtr node,
+  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath>
+  cartesian_planner);
+
+moveit::task_constructor::Task pick_task(
   moveit_msgs::msg::CollisionObject object,
   moveit::task_constructor::Stage * & attach_object_stage,
   rclcpp::Node::SharedPtr node,
@@ -73,7 +83,7 @@ moveit::task_constructor::Task PickTask(
   std::shared_ptr<moveit::planning_interface::PlanningSceneInterface>
   psi);
 
-moveit::task_constructor::Task PlaceTask(
+moveit::task_constructor::Task place_task(
   moveit_msgs::msg::CollisionObject object,
   geometry_msgs::msg::PoseStamped place_pose,
   rclcpp::Node::SharedPtr node,
@@ -86,7 +96,7 @@ moveit::task_constructor::Task PlaceTask(
   std::shared_ptr<moveit::planning_interface::PlanningSceneInterface>
   psi);
 
-moveit::task_constructor::Task PickAndPlaceTask(
+moveit::task_constructor::Task pick_and_place_task(
   moveit_msgs::msg::CollisionObject object,
   geometry_msgs::msg::PoseStamped place_pose,
   rclcpp::Node::SharedPtr node,
@@ -99,11 +109,11 @@ moveit::task_constructor::Task PickAndPlaceTask(
   std::shared_ptr<moveit::planning_interface::PlanningSceneInterface>
   psi);
 
-bool EvaluateJoint(
+bool evaluate_joint(
   const std::map<std::string, double> & desired_joint_values,
   const std::vector<double> & tolerances);
 
-bool ExecuteTask(
+bool execute_task(
   moveit::task_constructor::Task & task,
   rclcpp::Node::SharedPtr node);
 

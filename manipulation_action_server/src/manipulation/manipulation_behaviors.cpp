@@ -24,7 +24,7 @@ moveit::task_constructor::Task ConfigureTask(
   return task;
 }
 
-bool ExecuteTask(moveit::task_constructor::Task & task, rclcpp::Node::SharedPtr node)
+bool execute_task(moveit::task_constructor::Task & task, rclcpp::Node::SharedPtr node)
 {
   try {
     task.init();
@@ -60,7 +60,7 @@ bool ExecuteTask(moveit::task_constructor::Task & task, rclcpp::Node::SharedPtr 
   }
 }
 
-moveit::task_constructor::Task MoveToPredefinedTask(
+moveit::task_constructor::Task move_to_predefined_task(
   std::string group_name,
   std::string goal_pose,
   rclcpp::Node::SharedPtr node,
@@ -86,11 +86,11 @@ moveit::task_constructor::Task MoveToPredefinedTask(
   return task;
 }
 
-moveit::task_constructor::Task MoveJointTask(
+moveit::task_constructor::Task move_joint_task(
   std::string joint_name,
   double joint_value,
   rclcpp::Node::SharedPtr node,
-  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> interpolation_planner)
+  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner)
 {
   RCLCPP_INFO(node->get_logger(), "Executing goal");
 
@@ -105,8 +105,8 @@ moveit::task_constructor::Task MoveJointTask(
   {
     auto stage =
       std::make_unique<moveit::task_constructor::stages::MoveTo>(
-      "move_joint_to",
-      interpolation_planner);
+        "move_joint_to",
+        cartesian_planner);
     stage->setGroup(node->get_parameter("group").as_string());
     stage->setGoal(std::map<std::string, double>{{joint_name, joint_value}});
 
@@ -116,7 +116,46 @@ moveit::task_constructor::Task MoveJointTask(
   return task;
 }
 
-moveit::task_constructor::Task PickTask(
+moveit::task_constructor::Task move_end_effecto_task(
+  geometry_msgs::msg::TransformStamped eef2goal,
+  rclcpp::Node::SharedPtr node,
+  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner)
+{
+  RCLCPP_INFO(node->get_logger(), "Executing goal");
+
+  auto task = ConfigureTask("move_joint_task", node);
+
+  {
+    auto stage = std::make_unique<
+      moveit::task_constructor::stages::CurrentState>(
+      "current");
+    task.add(std::move(stage));
+  }
+  {
+    auto stage =
+      std::make_unique<moveit::task_constructor::stages::MoveRelative>(
+        "approach_object",
+        cartesian_planner);
+
+    stage->properties().set("marker_ns", "move_eef");
+    stage->properties().set("link", node->get_parameter("ik_frame"));
+    stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, {"group"});
+    stage->setMinMaxDistance(0.0, 0.15);
+    
+    // Set eef direction
+    geometry_msgs::msg::Vector3Stamped vec;
+    vec.header.frame_id = (node->get_parameter("ik_frame")).as_string();
+    vec.vector.x = eef2goal.transform.translation.x;
+    vec.vector.y = eef2goal.transform.translation.y;
+    vec.vector.z = eef2goal.transform.translation.z;
+    stage->setDirection(vec);
+    task.add(std::move(stage));
+  }
+  
+  return task;
+}
+
+moveit::task_constructor::Task pick_task(
   moveit_msgs::msg::CollisionObject object,
   moveit::task_constructor::Stage * & attach_object_stage,
   rclcpp::Node::SharedPtr node,
@@ -423,7 +462,7 @@ void PlaceAfterPickTask(
 
 }
 
-moveit::task_constructor::Task PickAndPlaceTask(
+moveit::task_constructor::Task pick_and_place_task(
   moveit_msgs::msg::CollisionObject object,
   geometry_msgs::msg::PoseStamped place_pose,
   rclcpp::Node::SharedPtr node,
@@ -434,7 +473,7 @@ moveit::task_constructor::Task PickAndPlaceTask(
 {
   moveit::task_constructor::Stage * attach_object_stage_ptr;
 
-  auto task = PickTask(
+  auto task = pick_task(
     object,
     attach_object_stage_ptr,
     node,
@@ -456,7 +495,7 @@ moveit::task_constructor::Task PickAndPlaceTask(
   return task;
 }
 
-moveit::task_constructor::Task PlaceTask(
+moveit::task_constructor::Task place_task(
   moveit_msgs::msg::CollisionObject object,
   geometry_msgs::msg::PoseStamped place_pose,
   rclcpp::Node::SharedPtr node,
@@ -605,9 +644,9 @@ bool IsGripperClosed(rclcpp::Node::SharedPtr node)
     desired_joint_values[gripper_joints[i]] = gripper_closed[i];
   }
 
-  return EvaluateJoint(desired_joint_values, gripper_tolerances);
+  return evaluate_joint(desired_joint_values, gripper_tolerances);
 }
-bool EvaluateJoint(
+bool evaluate_joint(
   const std::map<std::string, double> & desired_joint_values,
   const std::vector<double> & tolerances)
 {

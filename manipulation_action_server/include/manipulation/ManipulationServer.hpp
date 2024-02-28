@@ -54,6 +54,8 @@ private:
     const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle);
   void execute_move_joint(
     const std::shared_ptr<GoalHandleMoveJoint> goal_handle);
+  void execute_move_eef(
+    const std::shared_ptr<GoalHandleMoveEndEffector> goal_handle);
   void execute_pick(
     const std::shared_ptr<GoalHandlePick> goal_handle);
   void execute_pick_and_place(
@@ -65,6 +67,8 @@ private:
     action_server_move_to_predefined_;
   rclcpp_action::Server<MoveJoint>::SharedPtr
     action_server_move_joint_;
+  rclcpp_action::Server<MoveEndEffector>::SharedPtr
+    action_server_move_eef_;
   rclcpp_action::Server<Pick>::SharedPtr
     action_server_pick_;
   rclcpp_action::Server<PickAndPlace>::SharedPtr
@@ -78,6 +82,9 @@ private:
   rclcpp_action::GoalResponse handle_move_joint_goal(
     const rclcpp_action::GoalUUID & uuid,
     std::shared_ptr<const MoveJoint::Goal> goal);
+  rclcpp_action::GoalResponse handle_move_eef_goal(
+    const rclcpp_action::GoalUUID & uuid,
+    std::shared_ptr<const MoveEndEffector::Goal> goal);
   rclcpp_action::GoalResponse handle_pick_goal(
     const rclcpp_action::GoalUUID & uuid,
     std::shared_ptr<const Pick::Goal> goal);
@@ -92,6 +99,8 @@ private:
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<MoveToPredefined>> goal_handle);
   rclcpp_action::CancelResponse handle_move_joint_cancel(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<MoveJoint>> goal_handle);
+  rclcpp_action::CancelResponse handle_move_eef_cancel(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<MoveEndEffector>> goal_handle);
   rclcpp_action::CancelResponse handle_pick_cancel(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<Pick>> goal_handle);
   rclcpp_action::CancelResponse handle_pick_and_place_cancel(
@@ -103,6 +112,8 @@ private:
     const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle);
   void handle_move_joint_accepted(
     const std::shared_ptr<GoalHandleMoveJoint> goal_handle);
+  void handle_move_eef_accepted(
+    const std::shared_ptr<GoalHandleMoveEndEffector> goal_handle);
   void handle_pick_accepted(
     const std::shared_ptr<GoalHandlePick> goal_handle);
   void handle_pick_and_place_accepted(

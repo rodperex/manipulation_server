@@ -162,6 +162,17 @@ ManipulationServer::handle_move_joint_goal(
 }
 
 rclcpp_action::GoalResponse
+ManipulationServer::handle_move_eef_goal(
+  const rclcpp_action::GoalUUID & uuid,
+  std::shared_ptr<const manipulation_interfaces::action::MoveEndEffector::Goal> goal)
+{
+
+  RCLCPP_INFO(this->get_logger(), "Received goal: move end effector");
+  (void)uuid;
+  return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+}
+
+rclcpp_action::GoalResponse
 ManipulationServer::handle_pick_goal(
   const rclcpp_action::GoalUUID & uuid,
   std::shared_ptr<const manipulation_interfaces::action::Pick::Goal> goal)
@@ -203,14 +214,23 @@ ManipulationServer::handle_move_to_predefined_cancel(
   return rclcpp_action::CancelResponse::ACCEPT;
 }
 
-rclcpp_action::CancelResponse
-ManipulationServer::handle_move_joint_cancel(
-  const std::shared_ptr<rclcpp_action::ServerGoalHandle<manipulation_interfaces::action::MoveJoint>> goal_handle)
-{
-  RCLCPP_INFO(this->get_logger(), "Canceling goal: move group");
-  (void)goal_handle;
-  return rclcpp_action::CancelResponse::ACCEPT;
-}
+  rclcpp_action::CancelResponse
+  ManipulationServer::handle_move_joint_cancel(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<manipulation_interfaces::action::MoveJoint>> goal_handle)
+  {
+    RCLCPP_INFO(this->get_logger(), "Canceling goal: move group");
+    (void)goal_handle;
+    return rclcpp_action::CancelResponse::ACCEPT;
+  }
+
+  rclcpp_action::CancelResponse
+  ManipulationServer::handle_move_eef_cancel(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<manipulation_interfaces::action::MoveEndEffector>> goal_handle)
+  {
+    RCLCPP_INFO(this->get_logger(), "Canceling goal: move eef");
+    (void)goal_handle;
+    return rclcpp_action::CancelResponse::ACCEPT;
+  }
 
 rclcpp_action::CancelResponse
 ManipulationServer::handle_pick_cancel(
@@ -275,6 +295,53 @@ ManipulationServer::handle_move_joint_accepted(
 }
 
 void
+ManipulationServer::handle_move_eef_accepted(
+  const std::shared_ptr<GoalHandleMoveEndEffector> goal_handle)
+{
+  RCLCPP_INFO(
+    this->get_logger(), "Goal accepted (move_eef)");
+
+  std::thread{std::bind(&ManipulationServer::execute_move_eef, this, std::placeholders::_1),
+    goal_handle}.detach();
+}
+
+void
+ManipulationServer::handle_pick_accepted(
+  const std::shared_ptr<GoalHandlePick> goal_handle)
+{
+  RCLCPP_INFO(
+    this->get_logger(), "Goal accepted (pick): %s",
+    goal_handle->get_goal()->object_goal.id.c_str());
+
+  std::thread{std::bind(&ManipulationServer::execute_pick, this, std::placeholders::_1),
+    goal_handle}.detach();
+}
+
+void
+ManipulationServer::handle_pick_and_place_accepted(
+  const std::shared_ptr<GoalHandlePickAndPlace> goal_handle)
+{
+  RCLCPP_INFO(
+    this->get_logger(), "Goal accepted (pick_and_place): %s",
+    goal_handle->get_goal()->object.id.c_str());
+
+  std::thread{std::bind(&ManipulationServer::execute_pick_and_place, this, std::placeholders::_1),
+    goal_handle}.detach();
+}
+
+void
+ManipulationServer::handle_place_accepted(
+  const std::shared_ptr<GoalHandlePlace> goal_handle)
+{
+  RCLCPP_INFO(
+    this->get_logger(), "Goal accepted (place): %s",
+    goal_handle->get_goal()->attached_object.id.c_str());
+
+  std::thread{std::bind(&ManipulationServer::execute_place, this, std::placeholders::_1),
+    goal_handle}.detach();
+}
+
+void
 ManipulationServer::execute_move_to_predefined(
   const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle)
 {
@@ -289,7 +356,7 @@ ManipulationServer::execute_move_to_predefined(
   feedback->msg = "Creating task...";
   goal_handle->publish_feedback(feedback);
 
-  task_ = MoveToPredefinedTask(
+  task_ = move_to_predefined_task(
     goal->group_name,
     goal->goal_pose,
     node_,
@@ -298,7 +365,7 @@ ManipulationServer::execute_move_to_predefined(
   feedback->msg = "Executing task...";
   goal_handle->publish_feedback(feedback);
 
-  if (ExecuteTask(task_, node_)) {
+  if (execute_task(task_, node_)) {
     feedback->msg = "Task executed successfully";
     goal_handle->publish_feedback(feedback);
     RCLCPP_INFO(get_logger(), "Goal (move_to_predefined) succeeded");
@@ -328,7 +395,7 @@ ManipulationServer::execute_move_joint(
   feedback->msg = "Creating task...";
   goal_handle->publish_feedback(feedback);
 
-  task_ = MoveJointTask(
+  task_ = move_joint_task(
     goal->joint_name,
     goal->joint_value,
     node_,
@@ -337,7 +404,7 @@ ManipulationServer::execute_move_joint(
   feedback->msg = "Executing task...";
   goal_handle->publish_feedback(feedback);
 
-  if (ExecuteTask(task_, node_)) {
+  if (execute_task(task_, node_)) {
     feedback->msg = "Task executed successfully";
     goal_handle->publish_feedback(feedback);
     RCLCPP_INFO(get_logger(), "Goal (move_joint) succeeded");
@@ -353,16 +420,42 @@ ManipulationServer::execute_move_joint(
 }
 
 void
-ManipulationServer::handle_pick_accepted(
-  const std::shared_ptr<GoalHandlePick> goal_handle)
+ManipulationServer::execute_move_eef(
+  const std::shared_ptr<GoalHandleMoveEndEffector> goal_handle)
 {
   RCLCPP_INFO(
-    this->get_logger(), "Goal accepted (pick): %s",
-    goal_handle->get_goal()->object_goal.id.c_str());
+    this->get_logger(), "Executing goal (move_eef)");
 
-  std::thread{std::bind(&ManipulationServer::execute_pick, this, std::placeholders::_1),
-    goal_handle}.detach();
+  auto goal = goal_handle->get_goal();
+  auto result = std::make_shared<MoveEndEffector::Result>();
+  auto feedback = std::make_shared<MoveEndEffector::Feedback>();
+
+  feedback->msg = "Creating task...";
+  goal_handle->publish_feedback(feedback);
+
+  task_ = move_end_effecto_task(
+    goal->eef2goal,
+    node_,
+    cartesian_planner_);
+
+  feedback->msg = "Executing task...";
+  goal_handle->publish_feedback(feedback);
+
+  if (execute_task(task_, node_)) {
+    feedback->msg = "Task executed successfully";
+    goal_handle->publish_feedback(feedback);
+    RCLCPP_INFO(get_logger(), "Goal (move_joint) succeeded");
+    result->success = true;
+  } else {
+    feedback->msg = "Task failed";
+    goal_handle->publish_feedback(feedback);
+    RCLCPP_INFO(get_logger(), "Goal (move_joint) failed");
+    result->success = false;
+  }
+  task_.clear();
+  goal_handle->succeed(result);
 }
+
 
 void
 ManipulationServer::execute_pick(
@@ -376,7 +469,7 @@ ManipulationServer::execute_pick(
   auto result = std::make_shared<Pick::Result>();
   moveit::task_constructor::Stage * attach_object_stage;
 
-  task_ = PickTask(
+  task_ = pick_task(
     goal->object_goal,
     attach_object_stage,
     node_,
@@ -384,7 +477,7 @@ ManipulationServer::execute_pick(
     cartesian_planner_,
     planning_interface_);
 
-  if (ExecuteTask(task_, node_)) {
+  if (execute_task(task_, node_)) {
     // If the gripper is closed, the object has not been picked
     if (IsGripperClosed(node_)) {
       RCLCPP_INFO(get_logger(), "Goal (pick) was executed, but the object is not in the gripper");
@@ -404,18 +497,6 @@ ManipulationServer::execute_pick(
 }
 
 void
-ManipulationServer::handle_pick_and_place_accepted(
-  const std::shared_ptr<GoalHandlePickAndPlace> goal_handle)
-{
-  RCLCPP_INFO(
-    this->get_logger(), "Goal accepted (pick_and_place): %s",
-    goal_handle->get_goal()->object.id.c_str());
-
-  std::thread{std::bind(&ManipulationServer::execute_pick_and_place, this, std::placeholders::_1),
-    goal_handle}.detach();
-}
-
-void
 ManipulationServer::execute_pick_and_place(
   const std::shared_ptr<GoalHandlePickAndPlace> goal_handle)
 {
@@ -430,7 +511,7 @@ ManipulationServer::execute_pick_and_place(
   auto goal = goal_handle->get_goal();
   auto result = std::make_shared<PickAndPlace::Result>();
 
-  task_ = PickAndPlaceTask(
+  task_ = pick_and_place_task(
     goal->object,
     goal->place_pose,
     node_,
@@ -439,7 +520,7 @@ ManipulationServer::execute_pick_and_place(
     sampling_planner_,
     planning_interface_);
 
-  if (ExecuteTask(task_, node_)) {
+  if (execute_task(task_, node_)) {
     RCLCPP_INFO(get_logger(), "Goal (pick_and_place) succeeded");
     result->success = true;
   } else {
@@ -450,18 +531,6 @@ ManipulationServer::execute_pick_and_place(
   has_picked_ = false;
   task_.clear();
   goal_handle->succeed(result);
-}
-
-void
-ManipulationServer::handle_place_accepted(
-  const std::shared_ptr<GoalHandlePlace> goal_handle)
-{
-  RCLCPP_INFO(
-    this->get_logger(), "Goal accepted (place): %s",
-    goal_handle->get_goal()->attached_object.id.c_str());
-
-  std::thread{std::bind(&ManipulationServer::execute_place, this, std::placeholders::_1),
-    goal_handle}.detach();
 }
 
 void
@@ -479,7 +548,7 @@ ManipulationServer::execute_place(
   auto goal = goal_handle->get_goal();
   auto result = std::make_shared<Place::Result>();
 
-  task_ = PlaceTask(
+  task_ = place_task(
     goal->attached_object,
     goal->place_pose,
     node_,
@@ -488,7 +557,7 @@ ManipulationServer::execute_place(
     sampling_planner_,
     planning_interface_);
 
-  if (ExecuteTask(task_, node_)) {
+  if (execute_task(task_, node_)) {
     RCLCPP_INFO(get_logger(), "Goal (place) succeeded");
     result->success = true;
   } else {
