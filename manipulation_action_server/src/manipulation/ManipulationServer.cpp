@@ -410,7 +410,7 @@ ManipulationServer::execute_move_joint(
     goal->joint_name,
     goal->joint_value,
     node_,
-    cartesian_planner_);
+    interpolation_planner_);
 
   feedback->msg = "Executing task...";
   goal_handle->publish_feedback(feedback);

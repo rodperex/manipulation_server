@@ -91,7 +91,7 @@ moveit::task_constructor::Task move_joint_task(
   std::string joint_name,
   double joint_value,
   rclcpp::Node::SharedPtr node,
-  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner)
+  std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner)
 {
   RCLCPP_INFO(node->get_logger(), "Executing goal");
 
@@ -107,7 +107,7 @@ moveit::task_constructor::Task move_joint_task(
     auto stage =
       std::make_unique<moveit::task_constructor::stages::MoveTo>(
         "move_joint",
-        cartesian_planner);
+        interpolation_planner);
     RCLCPP_INFO(node->get_logger(), "Setting group: %s", node->get_parameter("group").as_string().c_str());
     // stage->setGroup(node->get_parameter("group").as_string());
     stage->setGroup(group_name);

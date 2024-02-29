@@ -64,8 +64,8 @@ moveit::task_constructor::Task move_joint_task(
   std::string joint_name,
   double joint_value,
   rclcpp::Node::SharedPtr node,
-  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath>
-  cartesian_planner);
+  std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
+  interpolation_planner);
 
 moveit::task_constructor::Task move_end_effector_task(
   geometry_msgs::msg::TransformStamped eef2goal,
