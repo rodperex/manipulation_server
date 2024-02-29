@@ -1,5 +1,5 @@
 #include "rclcpp/rclcpp.hpp"
-#include "manipulation/MoveToActionClient.hpp"
+#include "manipulation/MoveToPredefinedActionClient.hpp"
 
 int main(int argc, char ** argv)
 {

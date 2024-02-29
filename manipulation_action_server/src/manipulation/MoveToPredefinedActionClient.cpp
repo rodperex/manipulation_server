@@ -1,19 +1,19 @@
-#include "manipulation/MoveToActionClient.hpp"
+#include "manipulation/MoveToPredefinedActionClient.hpp"
 
 namespace manipulation
 {
 
 MoveToPredefinedActionClient::MoveToPredefinedActionClient()
-: Node("moveto_action_client")
+: Node("manipulation_client")
 {
   this->action_client_ = rclcpp_action::create_client<MoveToPredefined>(
     this, "move_to_predefined");
 
   auto goal_msg = manipulation_interfaces::action::MoveToPredefined_Goal();
 
+
   declare_parameter("group_name", "gripper");
   declare_parameter("goal_pose", "open");
-
   get_parameter("group_name", goal_msg.group_name);
   get_parameter("goal_pose", goal_msg.goal_pose);
 

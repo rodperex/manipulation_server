@@ -37,21 +37,27 @@ add_library(manipulation_server SHARED
 )
 ament_target_dependencies(manipulation_server ${dependencies})
 
-add_executable(server
-  src/main_srv.cpp
+add_library(manipulation_client SHARED
+  src/manipulation/MoveToPredefinedActionClient.cpp
+  src/manipulation/MoveEndEffectorActionClient.cpp
+  src/manipulation/MoveJointActionClient.cpp
 )
-ament_target_dependencies(server
-  ${dependencies}
-)
+ament_target_dependencies(manipulation_client ${dependencies})
+
+add_executable(server src/main_srv.cpp)
+ament_target_dependencies(server ${dependencies})
 target_link_libraries(server manipulation_server)
 
-add_executable(client
-  src/main_cli.cpp
-  src/manipulation/MoveToActionClient.cpp
-)
-ament_target_dependencies(client
-  ${dependencies}
-)
+
+add_executable(client_predef src/main_predef.cpp)
+target_link_libraries(client_predef manipulation_client)
+ament_target_dependencies(client_predef ${dependencies})
+add_executable(client_eef src/main_eef.cpp)
+target_link_libraries(client_eef manipulation_client)
+ament_target_dependencies(client_eef ${dependencies})
+add_executable(client_joint src/main_joint.cpp)
+target_link_libraries(client_joint manipulation_client)
+ament_target_dependencies(client_joint ${dependencies})
 
 rclcpp_components_register_nodes(manipulation_server
   "manipulation::ManipulationServer"
@@ -59,7 +65,9 @@ rclcpp_components_register_nodes(manipulation_server
 
 install(TARGETS
   server
-  client
+  client_predef
+  client_eef
+  client_joint
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}

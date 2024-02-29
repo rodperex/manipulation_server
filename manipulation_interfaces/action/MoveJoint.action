@@ -1,4 +1,5 @@
 # Request
+string group_name
 string joint_name
 float32 joint_value
 ---

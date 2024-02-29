@@ -44,6 +44,16 @@ ManipulationServer::on_configure(const rclcpp_lifecycle::State & state)
     std::bind(&ManipulationServer::handle_move_joint_accepted, this, std::placeholders::_1)
   );
 
+  action_server_move_eef_ = rclcpp_action::create_server<MoveEndEffector>(
+    this,
+    "move_end_effector",
+    std::bind(
+      &ManipulationServer::handle_move_eef_goal, this, std::placeholders::_1,
+      std::placeholders::_2),
+    std::bind(&ManipulationServer::handle_move_eef_cancel, this, std::placeholders::_1),
+    std::bind(&ManipulationServer::handle_move_eef_accepted, this, std::placeholders::_1)
+  );
+
   action_server_pick_ = rclcpp_action::create_server<Pick>(
     this,
     "pick",
@@ -396,6 +406,7 @@ ManipulationServer::execute_move_joint(
   goal_handle->publish_feedback(feedback);
 
   task_ = move_joint_task(
+    goal->group_name,
     goal->joint_name,
     goal->joint_value,
     node_,
@@ -433,7 +444,7 @@ ManipulationServer::execute_move_eef(
   feedback->msg = "Creating task...";
   goal_handle->publish_feedback(feedback);
 
-  task_ = move_end_effecto_task(
+  task_ = move_end_effector_task(
     goal->eef2goal,
     node_,
     cartesian_planner_);
@@ -444,12 +455,12 @@ ManipulationServer::execute_move_eef(
   if (execute_task(task_, node_)) {
     feedback->msg = "Task executed successfully";
     goal_handle->publish_feedback(feedback);
-    RCLCPP_INFO(get_logger(), "Goal (move_joint) succeeded");
+    RCLCPP_INFO(get_logger(), "Goal (move_eef) succeeded");
     result->success = true;
   } else {
     feedback->msg = "Task failed";
     goal_handle->publish_feedback(feedback);
-    RCLCPP_INFO(get_logger(), "Goal (move_joint) failed");
+    RCLCPP_INFO(get_logger(), "Goal (move_eef) failed");
     result->success = false;
   }
   task_.clear();

@@ -1,0 +1,9 @@
+manipulation_client:
+  ros__parameters:
+    x_eef: 0.1
+    y_eef: 0.2
+    z_eef: 0.5
+    goal_pose: close
+    group_name: arm
+    joint_name: arm_7_joint
+    joint_value: 0.2
