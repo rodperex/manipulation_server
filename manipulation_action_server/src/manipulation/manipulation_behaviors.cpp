@@ -122,9 +122,9 @@ moveit::task_constructor::Task move_joint_task(
 }
 
 moveit::task_constructor::Task move_end_effector_task(
-  geometry_msgs::msg::TransformStamped eef2goal,
+  geometry_msgs::msg::PoseStamped pose,
   rclcpp::Node::SharedPtr node,
-  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner)
+  std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner)
 {
   RCLCPP_INFO(node->get_logger(), "Executing goal");
 
@@ -136,27 +136,41 @@ moveit::task_constructor::Task move_end_effector_task(
       "current");
     task.add(std::move(stage));
   }
-  {
-    auto stage =
-      std::make_unique<moveit::task_constructor::stages::MoveRelative>(
-        "move_eef",
-        cartesian_planner);
 
-    stage->properties().set("marker_ns", "move_eef");
-    stage->properties().set("link", node->get_parameter("ik_frame"));
-    stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, {"group"});
-    // stage->setMinMaxDistance(0.0, 0.15);
+  {
+    auto stage = std::make_unique<moveit::task_constructor::stages::MoveTo>(
+      "move_eef",
+      interpolation_planner);
     
-    // Set eef direction
-    geometry_msgs::msg::Vector3Stamped vec;
-    vec.header.frame_id = (node->get_parameter("ik_frame")).as_string();
-    vec.vector.x = eef2goal.transform.translation.x;
-    vec.vector.y = eef2goal.transform.translation.y;
-    vec.vector.z = eef2goal.transform.translation.z;
-    stage->setDirection(vec);
+    Eigen::Isometry3d eigen_gripper;
+    Eigen::Quaterniond q = Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()) *
+      Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
+      Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitZ());
+    eigen_gripper.linear() = q.matrix();
+
+    RCLCPP_INFO(node->get_logger(), "Setting IK frame: %s", node->get_parameter("ik_frame").as_string().c_str());
+    stage->setIKFrame(eigen_gripper, node->get_parameter("ik_frame").as_string());
+    RCLCPP_INFO(node->get_logger(), "Setting group: %s", node->get_parameter("gripper_group").as_string().c_str());
+    stage->setGroup(node->get_parameter("gripper_group").as_string());
+    pose.header.frame_id = node->get_parameter("ik_frame").as_string();
+    stage->setGoal(pose);
     task.add(std::move(stage));
+    // auto wrapper =
+    //   std::make_unique<moveit::task_constructor::stages::ComputeIK>(
+    //   "pose_IK",
+    //   std::move(stage));
+    // wrapper->setMaxIKSolutions(8);
+    // wrapper->setMinSolutionDistance(1.0);
+    // wrapper->setIKFrame(eigen_gripper, node->get_parameter("ik_frame").as_string());
+    // wrapper->properties().configureInitFrom(
+    //   moveit::task_constructor::Stage::PARENT, {"eef",
+    //     "group"});
+    // wrapper->properties().configureInitFrom(
+    //   moveit::task_constructor::Stage::INTERFACE,
+    //   {"target_pose"});
+    // task.add(std::move(wrapper));
   }
-  
+
   return task;
 }
 

@@ -11,20 +11,20 @@ MoveEndEffectorActionClient::MoveEndEffectorActionClient()
 
   auto goal_msg = manipulation_interfaces::action::MoveEndEffector_Goal();
 
-  geometry_msgs::msg::TransformStamped tr;
+  geometry_msgs::msg::PoseStamped pose;
 
   declare_parameter("x_eef", 0.0);
   declare_parameter("y_eef", 0.0);
   declare_parameter("z_eef", 0.0);
-  get_parameter("x_eef", tr.transform.translation.x);
-  get_parameter("y_eef", tr.transform.translation.y);
-  get_parameter("z_eef", tr.transform.translation.z);
+  get_parameter("x_eef", pose.pose.position.x);
+  get_parameter("y_eef", pose.pose.position.y);
+  get_parameter("z_eef", pose.pose.position.z);
   
-  goal_msg.eef2goal = tr;
+  goal_msg.pose = pose;
 
   RCLCPP_INFO(
-    get_logger(), "Sending goal to move end effector to pose <%.2f,%.2f,%.2f>",
-      tr.transform.translation.x, tr.transform.translation.y, tr.transform.translation.z);
+    get_logger(), "Sending goal to move end effector to pose [%.2f, %.2f, %.2f]",
+      pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
 
   send_goal(goal_msg);
 }

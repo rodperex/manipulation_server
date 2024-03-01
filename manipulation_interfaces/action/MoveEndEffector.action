@@ -1,5 +1,5 @@
 # Request
-geometry_msgs/TransformStamped eef2goal
+geometry_msgs/PoseStamped pose
 ---
 # Result
 bool success

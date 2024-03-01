@@ -445,9 +445,9 @@ ManipulationServer::execute_move_eef(
   goal_handle->publish_feedback(feedback);
 
   task_ = move_end_effector_task(
-    goal->eef2goal,
+    goal->pose,
     node_,
-    cartesian_planner_);
+    interpolation_planner_);
 
   feedback->msg = "Executing task...";
   goal_handle->publish_feedback(feedback);
