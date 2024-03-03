@@ -14,11 +14,14 @@ find_package(manipulation_interfaces REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(rclcpp_cascade_lifecycle REQUIRED)
 find_package(rclcpp_components REQUIRED)
+find_package(rclpy REQUIRED)
+
 # find_package(backward_ros REQUIRED)
 
 
 set(dependencies
     rclcpp
+    rclpy
     rclcpp_action
     rclcpp_lifecycle
     rclcpp_components
@@ -59,6 +62,8 @@ add_executable(client_joint src/main_joint.cpp)
 target_link_libraries(client_joint manipulation_client)
 ament_target_dependencies(client_joint ${dependencies})
 
+add_executable(python_test script/manipulation_test.py)
+
 rclcpp_components_register_nodes(manipulation_server
   "manipulation::ManipulationServer"
 )
@@ -76,6 +81,10 @@ install(DIRECTORY
   params
   launch
   DESTINATION share/${PROJECT_NAME}
+)
+install(PROGRAMS
+  python_test
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY include/

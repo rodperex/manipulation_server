@@ -230,11 +230,6 @@ moveit::task_constructor::Task pick_task(
   task.add(std::move(stage_move_to_pick));
   RCLCPP_INFO(node->get_logger(), "Move to pick stage added");
 
-  // moveit::task_constructor::Stage* attach_object_stage =
-  //     nullptr;  // Forward attach_object_stage to place pose generator
-
-  // std::shared_ptr<moveit::task_constructor::Stage> attach_object_stage_ptr;
-
   // 3. Pick object
   RCLCPP_INFO(node->get_logger(), "3.- Pick object");
   {
@@ -268,40 +263,104 @@ moveit::task_constructor::Task pick_task(
     {
       // 3.2. Generate grasp pose
       RCLCPP_INFO(node->get_logger(), "\t3.2.- Generate grasp pose");
-      auto stage = std::make_unique<moveit::task_constructor::stages::GenerateGraspPose>(
-        "generate_grasp_pose");
-      stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT);
-      stage->properties().set("marker_ns", "grasp_pose");
-      stage->setPreGraspPose(open_pose);
-      stage->setObject(object.id);
-      stage->setAngleDelta(M_PI / 16);
-      stage->setMonitoredStage(current_state_ptr);  // Hook into current state
 
-      // This is the transform from the object frame to the end-effector frame THIS IS SO IMPORTANT
-      Eigen::Isometry3d grasp_frame_transform;
-      Eigen::Quaterniond q = Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()) *
-        Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
-        Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitZ());
-      grasp_frame_transform.linear() = q.matrix();
-      //TO DO: adapt to object shape
-      grasp_frame_transform.translation().z() = 0.0;
-      grasp_frame_transform.translation().x() = 0.03; //check this also this can be done like in a fallback
+      auto grasp_poses = std::make_unique<moveit::task_constructor::Alternatives>("grasp_poses");
+      task.properties().exposeTo(grasp_poses->properties(), {"eef", "group", "ik_frame"});
+      grasp_poses->properties().configureInitFrom(
+        moveit::task_constructor::Stage::PARENT,
+        {"eef", "group", "ik_frame"});    
 
-      // Compute IK
-      auto wrapper =
-        std::make_unique<moveit::task_constructor::stages::ComputeIK>(
-        "grasp_pose_IK",
-        std::move(stage));
-      wrapper->setMaxIKSolutions(8); // param?
-      wrapper->setMinSolutionDistance(1.0); // param?
-      wrapper->setIKFrame(grasp_frame_transform, (node->get_parameter("ik_frame")).as_string());
-      wrapper->properties().configureInitFrom(
-        moveit::task_constructor::Stage::PARENT, {"eef",
-          "group"});
-      wrapper->properties().configureInitFrom(
-        moveit::task_constructor::Stage::INTERFACE,
-        {"target_pose"});
-      grasp->insert(std::move(wrapper));
+      {
+        // asumes object is a cylinder: [height, radious] 
+
+        // we define 5 iterations for the object height:
+        auto botton_object_corner = -object.primitives[0].dimensions[0] / 2;
+
+        auto height_iterations = 3;
+        auto height_increment = object.primitives[0].dimensions[0] / height_iterations;
+
+        auto angle_iterations = 3;
+        auto starting_angle = -M_PI/4;
+        auto angle_increment = (-3*M_PI/4) / angle_iterations;
+        
+
+        for (int i = 0; i < height_iterations; ++i) {
+          auto stage = std::make_unique<moveit::task_constructor::stages::GenerateGraspPose>(
+          "generate_grasp_pose");
+          stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT);
+          stage->properties().set("marker_ns", "grasp_pose");
+          stage->setPreGraspPose(open_pose);
+          stage->setObject(object.id);
+          stage->setAngleDelta(M_PI / 3);
+          stage->setMonitoredStage(current_state_ptr);  // Hook into current state
+
+          // This is the transform from the object frame to the end-effector frame THIS IS SO IMPORTANT
+          Eigen::Isometry3d grasp_frame_transform;
+          Eigen::Quaterniond q = Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()) *
+            Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
+            Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitZ());
+          grasp_frame_transform.linear() = q.matrix();
+          //TO DO: adapt to object shape
+          grasp_frame_transform.translation().z() = botton_object_corner + ( i * height_increment );
+          grasp_frame_transform.translation().x() = 0.03; //check this also this can be done like in a fallback
+
+          // Compute IK
+          auto wrapper =
+            std::make_unique<moveit::task_constructor::stages::ComputeIK>(
+            "grasp_pose_IK",
+            std::move(stage));
+          wrapper->setMaxIKSolutions(8); // param?
+          wrapper->setMinSolutionDistance(1.0); // param?
+          wrapper->setIKFrame(grasp_frame_transform, (node->get_parameter("ik_frame")).as_string());
+          wrapper->properties().configureInitFrom(
+            moveit::task_constructor::Stage::PARENT, {"eef",
+              "group"});
+          wrapper->properties().configureInitFrom(
+            moveit::task_constructor::Stage::INTERFACE,
+            {"target_pose"});
+          // grasp->insert(std::move(wrapper));
+          grasp_poses->insert(std::move(wrapper));
+        }
+
+        for (int i = 0; i < angle_iterations; ++i) {
+          auto stage = std::make_unique<moveit::task_constructor::stages::GenerateGraspPose>(
+          "generate_grasp_pose");
+          stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT);
+          stage->properties().set("marker_ns", "grasp_pose");
+          stage->setPreGraspPose(open_pose);
+          stage->setObject(object.id);
+          stage->setAngleDelta(M_PI / 3);
+          stage->setMonitoredStage(current_state_ptr);  // Hook into current state
+
+          // This is the transform from the object frame to the end-effector frame THIS IS SO IMPORTANT
+          Eigen::Isometry3d grasp_frame_transform;
+          Eigen::Quaterniond q = Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()) *
+            Eigen::AngleAxisd(starting_angle + (i * angle_increment), Eigen::Vector3d::UnitY()) *
+            Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitZ());
+          grasp_frame_transform.linear() = q.matrix();
+          //TO DO: adapt to object shape
+          grasp_frame_transform.translation().z() = botton_object_corner*-1 -0.03; // top corner, since it is symetric
+          grasp_frame_transform.translation().x() = 0.03*2.3; // some heuristics
+
+          // Compute IK
+          auto wrapper =
+            std::make_unique<moveit::task_constructor::stages::ComputeIK>(
+            "grasp_pose_IK",
+            std::move(stage));
+          wrapper->setMaxIKSolutions(8); // param?
+          wrapper->setMinSolutionDistance(1.0); // param?
+          wrapper->setIKFrame(grasp_frame_transform, (node->get_parameter("ik_frame")).as_string());
+          wrapper->properties().configureInitFrom(
+            moveit::task_constructor::Stage::PARENT, {"eef",
+              "group"});
+          wrapper->properties().configureInitFrom(
+            moveit::task_constructor::Stage::INTERFACE,
+            {"target_pose"});
+          // grasp->insert(std::move(wrapper));
+          grasp_poses->insert(std::move(wrapper));
+        }
+      }
+      grasp->insert(std::move(grasp_poses));
     }
 
     {
