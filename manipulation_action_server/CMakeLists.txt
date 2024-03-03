@@ -62,8 +62,6 @@ add_executable(client_joint src/main_joint.cpp)
 target_link_libraries(client_joint manipulation_client)
 ament_target_dependencies(client_joint ${dependencies})
 
-add_executable(python_test script/manipulation_test.py)
-
 rclcpp_components_register_nodes(manipulation_server
   "manipulation::ManipulationServer"
 )
@@ -83,7 +81,7 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 install(PROGRAMS
-  python_test
+  script/manipulation_test.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
