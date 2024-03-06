@@ -33,21 +33,21 @@ def generate_launch_description():
         'laser_model': 'sick-571',
         'wrist_model': 'wrist-2010'
     }
-
+    
     moveit_config = (
         MoveItConfigsBuilder('tiago')
         .robot_description(file_path=os.path.join(
-            get_package_share_directory('tiago_mtc_examples'),
-            'config', 'tiago_fake.urdf.xacro'), mappings=mappings)
+            get_package_share_directory('mtc_tutorial'),
+            'config', 'tiago.urdf.xacro'), mappings=mappings)
         .robot_description_semantic(file_path=os.path.join(
-            get_package_share_directory('tiago_mtc_examples'),
+            get_package_share_directory('mtc_tutorial'),
             'config', 'tiago_pal-gripper.srdf'))
         .robot_description_kinematics(file_path=os.path.join(
-            get_package_share_directory('tiago_mtc_examples'),
+            get_package_share_directory('mtc_tutorial'),
             'config', 'kinematics_kdl.yaml'))
         .trajectory_execution(file_path=os.path.join(
-            get_package_share_directory('tiago_mtc_examples'),
-            'config', 'fake_controllers_manager.yaml'))
+            get_package_share_directory('mtc_tutorial'),
+            'config', 'controllers_pal-gripper.yaml'))
         .planning_pipelines(pipelines=['ompl'])
         .planning_scene_monitor({
                                     'publish_planning_scene': True,
@@ -56,7 +56,7 @@ def generate_launch_description():
                                     'publish_transforms_updates': True,
         })
         .pilz_cartesian_limits(file_path=os.path.join(
-            get_package_share_directory('tiago_mtc_examples'),
+            get_package_share_directory('mtc_tutorial'),
             'config', 'pilz_cartesian_limits.yaml'))
         .to_moveit_configs()
     )
