@@ -141,34 +141,10 @@ moveit::task_constructor::Task move_end_effector_task(
     auto stage = std::make_unique<moveit::task_constructor::stages::MoveTo>(
       "move_eef",
       interpolation_planner);
-    
-    Eigen::Isometry3d eigen_gripper;
-    Eigen::Quaterniond q = Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()) *
-      Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
-      Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitZ());
-    eigen_gripper.linear() = q.matrix();
 
-    RCLCPP_INFO(node->get_logger(), "Setting IK frame: %s", node->get_parameter("ik_frame").as_string().c_str());
-    stage->setIKFrame(eigen_gripper, node->get_parameter("ik_frame").as_string());
-    RCLCPP_INFO(node->get_logger(), "Setting group: %s", node->get_parameter("gripper_group").as_string().c_str());
-    stage->setGroup(node->get_parameter("gripper_group").as_string());
-    pose.header.frame_id = node->get_parameter("ik_frame").as_string();
+    stage->setGroup(node->get_parameter("arm_group").as_string());
     stage->setGoal(pose);
     task.add(std::move(stage));
-    // auto wrapper =
-    //   std::make_unique<moveit::task_constructor::stages::ComputeIK>(
-    //   "pose_IK",
-    //   std::move(stage));
-    // wrapper->setMaxIKSolutions(8);
-    // wrapper->setMinSolutionDistance(1.0);
-    // wrapper->setIKFrame(eigen_gripper, node->get_parameter("ik_frame").as_string());
-    // wrapper->properties().configureInitFrom(
-    //   moveit::task_constructor::Stage::PARENT, {"eef",
-    //     "group"});
-    // wrapper->properties().configureInitFrom(
-    //   moveit::task_constructor::Stage::INTERFACE,
-    //   {"target_pose"});
-    // task.add(std::move(wrapper));
   }
 
   return task;
