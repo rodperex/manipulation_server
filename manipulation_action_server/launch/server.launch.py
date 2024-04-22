@@ -40,7 +40,7 @@ def generate_launch_description():
             get_package_share_directory('tiago_description'),
             'robots', 'tiago.urdf.xacro'), mappings=mappings)
         .robot_description_semantic(file_path=os.path.join(
-            get_package_share_directory('mtc_tutorial'),
+            get_package_share_directory('tiago_mtc_examples'),
             'config', 'tiago_pal-gripper.srdf'))
         .robot_description_kinematics(file_path=os.path.join(
             get_package_share_directory('tiago_moveit_config'),
