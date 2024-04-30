@@ -130,6 +130,21 @@ moveit::task_constructor::Task move_end_effector_task(
 
   auto task = configure_task("move_eef_task", node);
 
+  auto cartesian = std::make_shared<moveit::task_constructor::solvers::CartesianPath>();
+	cartesian->setJumpThreshold(2.0);
+
+  const auto ptp = [&node]() {
+		auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "pilz_industrial_motion_planner") };
+		pp->setPlannerId("PTP");
+		return pp;
+	}();
+
+  const auto rrtconnect = [&node]() {
+		auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "ompl") };
+		pp->setPlannerId("RRTConnect");
+		return pp;
+	}();
+
   {
     auto stage = std::make_unique<
       moveit::task_constructor::stages::CurrentState>(
@@ -137,15 +152,21 @@ moveit::task_constructor::Task move_end_effector_task(
     task.add(std::move(stage));
   }
 
-  {
-    auto stage = std::make_unique<moveit::task_constructor::stages::MoveTo>(
-      "move_eef",
-      interpolation_planner);
+  auto fallbacks = std::make_unique<moveit::task_constructor::Fallbacks>("posible_solutions");
+  auto add_to_fallbacks{ [&](auto& solver, auto& name) {
+		auto move_to = std::make_unique<moveit::task_constructor::stages::MoveTo>(name, solver);
+		move_to->setGroup(node->get_parameter("arm_group").as_string());
+		move_to->setGoal(pose);
+		fallbacks->add(std::move(move_to));
+	} };
 
-    stage->setGroup(node->get_parameter("arm_group").as_string());
-    stage->setGoal(pose);
-    task.add(std::move(stage));
-  }
+  add_to_fallbacks(cartesian, "Cartesian path");
+  add_to_fallbacks(interpolation_planner, "Interpolation path");
+	add_to_fallbacks(ptp, "PTP path");
+	add_to_fallbacks(rrtconnect, "RRT path");
+
+
+  task.add(std::move(fallbacks));
 
   return task;
 }

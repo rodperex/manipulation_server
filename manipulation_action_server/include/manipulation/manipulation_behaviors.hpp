@@ -11,6 +11,8 @@
 #include "rclcpp_action/rclcpp_action.hpp"
 #include <moveit/planning_scene/planning_scene.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
+#include <moveit/task_constructor/solvers/cartesian_path.h>
+#include <moveit/task_constructor/solvers/pipeline_planner.h>
 #include <moveit/task_constructor/task.h>
 #include <moveit/task_constructor/solvers.h>
 #include <moveit/task_constructor/stages.h>
