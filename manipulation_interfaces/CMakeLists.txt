@@ -6,6 +6,12 @@ find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+
+set(MSG_DEPS
+  moveit_msgs
+  geometry_msgs
+  sensor_msgs)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -16,11 +22,12 @@ set(action_msgs
     action/Place.action
     action/PickAndPlace.action
     action/MoveEndEffector.action
+    action/PickFromPc.action
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
     ${action_msgs}
-    DEPENDENCIES moveit_msgs
+    DEPENDENCIES ${MSG_DEPS}
 )
 
 ament_export_dependencies(rosidl_default_runtime)

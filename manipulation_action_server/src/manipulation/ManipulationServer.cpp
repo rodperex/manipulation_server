@@ -84,6 +84,16 @@ ManipulationServer::on_configure(const rclcpp_lifecycle::State & state)
     std::bind(&ManipulationServer::handle_place_accepted, this, std::placeholders::_1)
   );
 
+  action_server_pick_from_pc_ = rclcpp_action::create_server<PickFromPc>(
+    this,
+    "pick_from_pc",
+    std::bind(
+      &ManipulationServer::handle_pick_from_pc_goal, this, std::placeholders::_1,
+      std::placeholders::_2),
+    std::bind(&ManipulationServer::handle_pick_from_pc_cancel, this, std::placeholders::_1),
+    std::bind(&ManipulationServer::handle_pick_from_pc_accepted, this, std::placeholders::_1)
+  );
+
   planning_interface_ = std::make_shared<moveit::planning_interface::PlanningSceneInterface>();
 
   interpolation_planner_ =
@@ -494,6 +504,8 @@ ManipulationServer::execute_pick(
       RCLCPP_INFO(get_logger(), "Goal (pick) was executed, but the object is not in the gripper");
       result->success = false;
       has_picked_ = false;
+      auto all_objects = planning_interface_->getKnownObjectNames();
+      planning_interface_->removeCollisionObjects(all_objects);
     } else {
       RCLCPP_INFO(get_logger(), "Goal (pick) succeeded");
       result->success = true;
@@ -501,6 +513,8 @@ ManipulationServer::execute_pick(
     }
   } else {
     RCLCPP_INFO(get_logger(), "Goal (pick) failed");
+    auto all_objects = planning_interface_->getKnownObjectNames();
+    planning_interface_->removeCollisionObjects(all_objects);
     result->success = false;
   }
   task_.clear();
@@ -539,6 +553,9 @@ ManipulationServer::execute_pick_and_place(
     result->success = false;
   }
 
+  auto all_objects = planning_interface_->getKnownObjectNames();
+  planning_interface_->removeCollisionObjects(all_objects);
+
   has_picked_ = false;
   task_.clear();
   goal_handle->succeed(result);
@@ -573,12 +590,20 @@ ManipulationServer::execute_place(
     result->success = true;
   } else {
     RCLCPP_INFO(get_logger(), "Goal (place) failed");
+    // deattach object:
     result->success = false;
+    task_.clear();
+    task_ = detach_object_task(goal->attached_object, node_);
+    execute_task(task_, node_);    
   }
 
+ 
   has_picked_ = false;
   task_.clear();
   goal_handle->succeed(result);
+  
+  auto all_objects = planning_interface_->getKnownObjectNames();
+  planning_interface_->removeCollisionObjects(all_objects);
 }
 
 } // namespace manipulation

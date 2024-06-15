@@ -22,6 +22,7 @@
 #include "manipulation_interfaces/action/pick.hpp"
 #include "manipulation_interfaces/action/place.hpp"
 #include "manipulation_interfaces/action/pick_and_place.hpp"
+#include "manipulation_interfaces/action/pick_from_pc.hpp"
 #if __has_include(<tf2_geometry_msgs/tf2_geometry_msgs.hpp>)
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #else
@@ -53,6 +54,9 @@ using GoalHandlePlace = rclcpp_action::ServerGoalHandle<Place>;
 
 using PickAndPlace = manipulation_interfaces::action::PickAndPlace;
 using GoalHandlePickAndPlace = rclcpp_action::ServerGoalHandle<PickAndPlace>;
+
+using PickFromPC = manipulation_interfaces::action::PickFromPC;
+using GoalHandlePickFromPC = rclcpp_action::ServerGoalHandle<PickFromPC>;
 
 moveit::task_constructor::Task move_to_predefined_task(
   std::string group_name,
@@ -111,6 +115,10 @@ moveit::task_constructor::Task pick_and_place_task(
     sampling_planner,
   std::shared_ptr<moveit::planning_interface::PlanningSceneInterface>
     psi);
+
+moveit::task_constructor::Task detach_object_task(
+  moveit_msgs::msg::CollisionObject object,
+  rclcpp::Node::SharedPtr node);
 
 bool evaluate_joint(
   const std::map<std::string, double> & desired_joint_values,

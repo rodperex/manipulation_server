@@ -395,7 +395,7 @@ moveit::task_constructor::Task pick_task(
         "lift_object",
         cartesian_planner);
       stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, {"group"});
-      stage->setMinMaxDistance(0.1, 0.3);
+      stage->setMinMaxDistance(0.0, 0.3);
       stage->setIKFrame(node->get_parameter("ik_frame").as_string());
       stage->properties().set("marker_ns", "lift_object");
 
@@ -601,6 +601,29 @@ moveit::task_constructor::Task place_task(
   return task;
 
 }
+
+moveit::task_constructor::Task detach_object_task(
+  moveit_msgs::msg::CollisionObject object,
+  rclcpp::Node::SharedPtr node)
+{
+  moveit::task_constructor::Task task;
+
+  task = configure_task("detach_object_task", node);
+
+  moveit::task_constructor::Stage * current_state_ptr = nullptr;
+  auto stage_state_current = std::make_unique<moveit::task_constructor::stages::CurrentState>(
+    "current");
+
+  task.add(std::move(stage_state_current));
+
+  auto stage = std::make_unique<moveit::task_constructor::stages::ModifyPlanningScene>(
+    "detach_object");
+  stage->detachObject(object.id, node->get_parameter("ik_frame").as_string());
+  task.add(std::move(stage));
+
+  return task;
+}
+
 
 bool IsGripperClosed(rclcpp::Node::SharedPtr node)
 {
