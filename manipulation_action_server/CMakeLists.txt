@@ -4,6 +4,14 @@ project(manipulation_action_server)
 set(CMAKE_CONFIG_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CONFIG_PATH}")
 
+find_library(GPD_LIB NAMES gpd PATHS /usr/local/lib PATH_SUFFIXES lib NO_DEFAULT_PATH)
+if (GPD_LIB)
+  message(STATUS "Library GPD found in ${GPD_LIB}")
+else()
+  message(FATAL_ERROR "Library GPD not found")
+endif()
+include_directories(${GPD_LIB_INCLUDE_DIR})
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(ament_index_cpp REQUIRED)
@@ -15,6 +23,13 @@ find_package(rclcpp_lifecycle REQUIRED)
 find_package(rclcpp_cascade_lifecycle REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(rclpy REQUIRED)
+find_package(pcl_conversions REQUIRED)
+find_package(PCL 1.9 REQUIRED)
+find_package(OpenCV REQUIRED)
+
+include_directories(${PCL_INCLUDE_DIRS})
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
 
 # find_package(backward_ros REQUIRED)
 
@@ -29,6 +44,9 @@ set(dependencies
     moveit_task_constructor_core
     manipulation_interfaces
     rclcpp_cascade_lifecycle
+    pcl_conversions
+    PCL
+    OpenCV
 )
 
 include_directories(
@@ -39,6 +57,7 @@ add_library(manipulation_server SHARED
   src/manipulation/manipulation_behaviors.cpp
 )
 ament_target_dependencies(manipulation_server ${dependencies})
+target_link_libraries(manipulation_server ${GPD_LIB})
 
 add_library(manipulation_client SHARED
   src/manipulation/MoveToPredefinedActionClient.cpp

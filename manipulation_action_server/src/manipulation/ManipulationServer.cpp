@@ -225,6 +225,17 @@ ManipulationServer::handle_place_goal(
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
+rclcpp_action::GoalResponse
+ManipulationServer::handle_pick_from_pc_goal(
+  const rclcpp_action::GoalUUID & uuid,
+  std::shared_ptr<const manipulation_interfaces::action::PickFromPc::Goal> goal)
+{
+
+  RCLCPP_INFO(this->get_logger(), "Received goal: pick_from_pc");
+  (void)uuid;
+  return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+}
+
 rclcpp_action::CancelResponse
 ManipulationServer::handle_move_to_predefined_cancel(
   const std::shared_ptr<rclcpp_action::ServerGoalHandle<manipulation_interfaces::action::MoveToPredefined>> goal_handle)
@@ -278,6 +289,16 @@ ManipulationServer::handle_place_cancel(
   <rclcpp_action::ServerGoalHandle<manipulation_interfaces::action::Place>> goal_handle)
 {
   RCLCPP_INFO(this->get_logger(), "Canceling goal: place");
+  (void)goal_handle;
+  return rclcpp_action::CancelResponse::ACCEPT;
+}
+
+rclcpp_action::CancelResponse
+ManipulationServer::handle_pick_from_pc_cancel(
+  const std::shared_ptr
+  <rclcpp_action::ServerGoalHandle<manipulation_interfaces::action::PickFromPc>> goal_handle)
+{
+  RCLCPP_INFO(this->get_logger(), "Canceling goal: pick_from_pc");
   (void)goal_handle;
   return rclcpp_action::CancelResponse::ACCEPT;
 }
@@ -358,6 +379,17 @@ ManipulationServer::handle_place_accepted(
     goal_handle->get_goal()->attached_object.id.c_str());
 
   std::thread{std::bind(&ManipulationServer::execute_place, this, std::placeholders::_1),
+    goal_handle}.detach();
+}
+
+void
+ManipulationServer::handle_pick_from_pc_accepted(
+  const std::shared_ptr<GoalHandlePickFromPc> goal_handle)
+{
+  RCLCPP_INFO(
+    this->get_logger(), "Goal accepted (pick_from_pc)");
+
+  std::thread{std::bind(&ManipulationServer::execute_pick_from_pc, this, std::placeholders::_1),
     goal_handle}.detach();
 }
 
@@ -605,6 +637,32 @@ ManipulationServer::execute_place(
   auto all_objects = planning_interface_->getKnownObjectNames();
   planning_interface_->removeCollisionObjects(all_objects);
 }
+
+void
+ManipulationServer::execute_pick_from_pc(
+  const std::shared_ptr<GoalHandlePickFromPc> goal_handle)
+{
+  RCLCPP_INFO(
+    this->get_logger(), "Executing goal (pick_from_pc)");
+
+  auto goal = goal_handle->get_goal();
+  auto result = std::make_shared<PickFromPc::Result>();
+
+  task_ = pick_from_pc_task(
+    goal->object_goal,
+    node_);
+
+  if (execute_task(task_, node_)) {
+    RCLCPP_INFO(get_logger(), "Goal (pick_from_pc) succeeded");
+    result->success = true;
+  } else {
+    RCLCPP_INFO(get_logger(), "Goal (pick_from_pc) failed");
+    result->success = false;
+  }
+  task_.clear();
+  goal_handle->succeed(result); 
+}
+
 
 } // namespace manipulation
 

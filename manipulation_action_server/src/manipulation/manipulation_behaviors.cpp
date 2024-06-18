@@ -624,6 +624,220 @@ moveit::task_constructor::Task detach_object_task(
   return task;
 }
 
+moveit::task_constructor::Task pick_from_pc_task(
+  sensor_msgs::msg::PointCloud2 object,
+  rclcpp::Node::SharedPtr node)
+{
+  RCLCPP_INFO_STREAM(node->get_logger(), "Executing pick from pc");
+
+  std::string retreat_axis, config_file, gripper_group, gripper_joint;
+  std::vector<std::string> gripper_joints;
+  std::vector<double> gripper_min_limits, gripper_max_limits;
+  int axis_index;
+  float retreat_min, retreat_max, retreat_resolution;
+  std::vector<std::tuple<float, float, float>> pc_points_xyz;
+
+  // node->get_parameter("pick_from_pc.retreat_axis", retreat_axis);
+  // node->get_parameter("pick_from_pc.retreat_min", retreat_min);
+  // node->get_parameter("pick_from_pc.retreat_max", retreat_max);
+  // node->get_parameter("pick_from_pc.retreat_resolution", retreat_resolution);
+  node->get_parameter("pick_from_pc.config_file", config_file);
+  node->get_parameter("gripper_group", gripper_group);
+  node->get_parameter("gripper_joints", gripper_joints);
+  node->get_parameter("gripper_closed", gripper_min_limits);
+  node->get_parameter("gripper_open", gripper_max_limits);
+
+  gpd::GraspDetector* grasp_detector = new gpd::GraspDetector(config_file);
+
+  auto cloud_camera = process_point_cloud(object);
+
+  grasp_detector->preprocessPointCloud(*cloud_camera);
+
+  auto candidates = grasp_detector->detectGrasps(*cloud_camera);
+
+  auto task = configure_task("pick_from_pc_task", node);
+
+  moveit::task_constructor::Stage * current_state_ptr = nullptr;
+  auto stage_state_current = std::make_unique<moveit::task_constructor::stages::CurrentState>(
+    "current");
+  current_state_ptr = stage_state_current.get();
+  task.add(std::move(stage_state_current));
+
+  auto cartesian = std::make_shared<moveit::task_constructor::solvers::CartesianPath>();
+	cartesian->setJumpThreshold(2.0);
+
+  const auto ptp = [&node]() {
+		auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "pilz_industrial_motion_planner") };
+		pp->setPlannerId("PTP");
+		return pp;
+	}();
+
+  const auto rrtconnect = [&node]() {
+		auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "ompl") };
+		pp->setPlannerId("RRTConnect");
+		return pp;
+	}();
+
+  auto fallbacks = std::make_unique<moveit::task_constructor::Fallbacks>("posible_solutions");
+
+  auto add_to_fallbacks{ [&](auto& solver, auto& name, auto& pose, auto& width) {
+    auto  serial = std::make_unique<moveit::task_constructor::SerialContainer>("move_nd_close");
+		auto move_to = std::make_unique<moveit::task_constructor::stages::MoveTo>(name, solver);
+    auto close_gripper = std::make_unique<moveit::task_constructor::stages::MoveTo>("close_gripper", solver);
+
+    close_gripper->setGroup(gripper_group);  
+    close_gripper->setGoal(std::map<std::string, double>{{gripper_joints[0], gripper_min_limits[0]},
+                                                  {gripper_joints[1], width}});
+
+		move_to->setGroup(node->get_parameter("arm_group").as_string());
+		move_to->setGoal(pose);
+
+    serial->insert(std::move(move_to));
+    serial->insert(std::move(close_gripper));
+
+		fallbacks->add(std::move(serial));
+	} };
+
+  for (const auto& grasp : candidates)
+  {
+    geometry_msgs::msg::PoseStamped pose;
+    
+
+    pose.header.frame_id = object.header.frame_id;
+
+    pose.pose.position.x = grasp->getPosition().x();
+    pose.pose.position.y = grasp->getPosition().x();
+    pose.pose.position.z = grasp->getPosition().x();
+
+    auto orientation_matrix = grasp->getOrientation();
+    Eigen::Quaterniond q(orientation_matrix);
+
+    pose.pose.orientation.x = q.x();
+    pose.pose.orientation.y = q.y();
+    pose.pose.orientation.z = q.z();
+    pose.pose.orientation.w = q.w();
+
+    double width = grasp->getGraspWidth();
+
+    add_to_fallbacks(cartesian, "Cartesian path", pose, width);
+    add_to_fallbacks(ptp, "PTP path", pose, width);
+    add_to_fallbacks(rrtconnect, "RRT path", pose, width);
+  }
+
+  task.add(std::move(fallbacks));
+
+  return task;
+
+
+
+
+
+
+
+  // auto result = std::make_shared<PickFromPc::Result>();
+
+  // auto task = configure_task("pick_from_pc_task", node);
+
+  // moveit::task_constructor::Stage * current_state_ptr = nullptr;
+  // auto stage_state_current = std::make_unique<moveit::task_constructor::stages::CurrentState>(
+  //   "current");
+  // current_state_ptr = stage_state_current.get();
+  // task.add(std::move(stage_state_current));
+
+  // auto cartesian = std::make_shared<moveit::task_constructor::solvers::CartesianPath>();
+	// cartesian->setJumpThreshold(2.0);
+
+  // const auto ptp = [&node]() {
+	// 	auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "pilz_industrial_motion_planner") };
+	// 	pp->setPlannerId("PTP");
+	// 	return pp;
+	// }();
+
+  // const auto rrtconnect = [&node]() {
+	// 	auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "ompl") };
+	// 	pp->setPlannerId("RRTConnect");
+	// 	return pp;
+	// }();
+
+  // auto fallbacks = std::make_unique<moveit::task_constructor::Fallbacks>("posible_solutions");
+  // auto add_to_fallbacks{ [&](auto& solver, auto& name, auto& pose) {
+	// 	auto move_to = std::make_unique<moveit::task_constructor::stages::MoveTo>(name, solver);
+	// 	move_to->setGroup(node->get_parameter("arm_group").as_string());
+	// 	move_to->setGoal(pose);
+	// 	fallbacks->add(std::move(move_to));
+	// } };
+
+  // sensor_msgs::PointCloud2ConstIterator<float> iter_x(object, "x");
+  // sensor_msgs::PointCloud2ConstIterator<float> iter_y(object, "y");
+  // sensor_msgs::PointCloud2ConstIterator<float> iter_z(object, "z");
+
+  // for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z)
+  // {
+  //   pc_points_xyz.emplace_back(*iter_x, *iter_y, *iter_z);
+  // }
+  
+  // if (retreat_axis == "x")
+  // {
+  //   axis_index = 0;
+  // }
+  // else if (retreat_axis == "y")
+  // {
+  //   axis_index = 1;
+  // }
+  // else if (retreat_axis == "z")
+  // {
+  //   axis_index = 2;
+  // }
+  // else
+  // {
+  //   RCLCPP_ERROR_STREAM(node->get_logger(), "Invalid retreat axis");
+  //   return task;
+  // }
+
+  // std::sort(pc_points_xyz.begin(), pc_points_xyz.end(), [axis_index](const std::tuple<float, float, float> &a, const std::tuple<float, float, float> &b) {
+  //   switch (axis_index)
+  //   {
+  //   case 0:
+  //     return std::get<0>(a) < std::get<0>(b);  // Compare x values
+  //   case 1:
+  //     return std::get<1>(a) < std::get<1>(b);  // Compare y values
+  //   case 2: 
+  //     return std::get<2>(a) < std::get<2>(b);  // Compare z values
+  //   }
+  // });
+
+  // for (float min = retreat_min; min < retreat_max; min += retreat_resolution)
+  // {
+  //   geometry_msgs::msg::PoseStamped pose;
+  //   pose.header.frame_id = object.header.frame_id;
+  //   switch (axis_index)
+  //   {
+  //   case 0:
+  //     pose.pose.position.x = std::get<0>(pc_points_xyz[0])- min; 
+  //     pose.pose.position.y = std::get<1>(pc_points_xyz[0]);
+  //     pose.pose.position.z = std::get<2>(pc_points_xyz[0]);
+  //     break;
+  //   case 1:
+  //     pose.pose.position.x = std::get<0>(pc_points_xyz[0]);
+  //     pose.pose.position.y = std::get<1>(pc_points_xyz[0]) - min;
+  //     pose.pose.position.z = std::get<2>(pc_points_xyz[0]);
+  //     break;
+  //   case 2:
+  //     pose.pose.position.x = std::get<0>(pc_points_xyz[0]);
+  //     pose.pose.position.y = std::get<1>(pc_points_xyz[0]);
+  //     pose.pose.position.z = std::get<2>(pc_points_xyz[0]) - min;
+  //     break;
+  //   }
+  //   add_to_fallbacks(cartesian, "Cartesian path", pose);
+  //   add_to_fallbacks(ptp, "PTP path", pose);
+  //   add_to_fallbacks(rrtconnect, "RRT path", pose);
+  // }
+
+  // task.add(std::move(fallbacks));
+
+  // return task;
+}
+
 
 bool IsGripperClosed(rclcpp::Node::SharedPtr node)
 {
@@ -699,5 +913,28 @@ bool evaluate_joint(
   return are_joints_values_within_tolerance;
 }
 
+gpd::util::Cloud* process_point_cloud(sensor_msgs::msg::PointCloud2 pc)
+{
+  Eigen::Matrix3Xd view_points(3,1);
+  view_points << 0.0, 0.0, 0.0;
+  gpd::util::Cloud* cloud_camera;
+  // matbe we have to set another view point rather than 0 0 0
+
+  if (pc.fields.size() == 6 && pc.fields[3].name == "normal_x" && pc.fields[4].name == "normal_y" && pc.fields[5].name == "normal_z")
+  {
+    PointCloudRGBA::Ptr cloud(new PointCloudRGBA);
+    pcl::fromROSMsg(pc, *cloud);
+    cloud_camera = new gpd::util::Cloud(cloud, 0, view_points);
+
+  }
+  else
+  {
+    PointCloudRGBA::Ptr cloud(new PointCloudRGBA);
+    pcl::fromROSMsg(pc, *cloud);
+    cloud_camera = new gpd::util::Cloud(cloud, 0, view_points);
+  }
+
+  return cloud_camera;
+}
 
 } // end namespace manipulation

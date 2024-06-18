@@ -11,4 +11,13 @@ manipulation_action_server_executor:
     gripper_closed: [0.0, 0.0]
     gripper_open: [0.04, 0.04]
     gripper_tolerances: [0.01, 0.01]
+
+    pick_from_pc:
+      retreat_axis: "y"
+      retreat_min: 0.05 # middle of the gripper
+      retreat_max: 0.1  # end of the gripper
+      retreat_resolution: 0.01 # distance to st
+      config_file: "config/pick_from_pc.yaml"
+     
+
     

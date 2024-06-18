@@ -62,6 +62,8 @@ private:
     const std::shared_ptr<GoalHandlePickAndPlace> goal_handle);
   void execute_place(
     const std::shared_ptr<GoalHandlePlace> goal_handle);
+  void execute_pick_from_pc(
+    const std::shared_ptr<GoalHandlePickFromPc> goal_handle);
 
   rclcpp_action::Server<MoveToPredefined>::SharedPtr
     action_server_move_to_predefined_;
@@ -75,6 +77,8 @@ private:
     action_server_pick_and_place_;
   rclcpp_action::Server<Place>::SharedPtr
     action_server_place_;
+  rclcpp_action::Server<PickFromPc>::SharedPtr
+    action_server_pick_from_pc_;
 
   rclcpp_action::GoalResponse handle_move_to_predefined_goal(
     const rclcpp_action::GoalUUID & uuid,
@@ -94,6 +98,9 @@ private:
   rclcpp_action::GoalResponse handle_place_goal(
     const rclcpp_action::GoalUUID & uuid,
     std::shared_ptr<const Place::Goal> goal);
+  rclcpp_action::GoalResponse handle_pick_from_pc_goal(
+    const rclcpp_action::GoalUUID & uuid,
+    std::shared_ptr<const PickFromPc::Goal> goal);
 
   rclcpp_action::CancelResponse handle_move_to_predefined_cancel(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<MoveToPredefined>> goal_handle);
@@ -107,6 +114,8 @@ private:
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<PickAndPlace>> goal_handle);
   rclcpp_action::CancelResponse handle_place_cancel(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<Place>> goal_handle);
+  rclcpp_action::CancelResponse handle_pick_from_pc_cancel(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<PickFromPc>> goal_handle);
 
   void handle_move_to_predefined_accepted(
     const std::shared_ptr<GoalHandleMoveToPredefined> goal_handle);
@@ -120,6 +129,8 @@ private:
     const std::shared_ptr<GoalHandlePickAndPlace> goal_handle);
   void handle_place_accepted(
     const std::shared_ptr<GoalHandlePlace> goal_handle);
+  void handle_pick_from_pc_accepted(
+    const std::shared_ptr<GoalHandlePickFromPc> goal_handle);
 
   moveit::task_constructor::Task task_;
 

@@ -2,18 +2,21 @@
 #define MANIPULATION__MANIPULATION_BEHAVIORS_HPP
 
 #include <map>
-#include <moveit_msgs/srv/get_planning_scene.hpp>
 #include <algorithm>
 #include <chrono>
 #include <rclcpp/rclcpp.hpp>
 #include <algorithm>
 #include <vector>
+#include <tuple>
+
 #include "rclcpp_action/rclcpp_action.hpp"
 #include <moveit/planning_scene/planning_scene.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit/task_constructor/solvers/cartesian_path.h>
 #include <moveit/task_constructor/solvers/pipeline_planner.h>
 #include <moveit/task_constructor/task.h>
+#include <moveit_msgs/srv/get_planning_scene.hpp>
+
 #include <moveit/task_constructor/solvers.h>
 #include <moveit/task_constructor/stages.h>
 #include "manipulation_interfaces/action/move_to_predefined.hpp"
@@ -23,6 +26,17 @@
 #include "manipulation_interfaces/action/place.hpp"
 #include "manipulation_interfaces/action/pick_and_place.hpp"
 #include "manipulation_interfaces/action/pick_from_pc.hpp"
+#include "sensor_msgs/msg/point_cloud2.hpp"
+#include <sensor_msgs/point_cloud2_iterator.hpp>
+#include <gpd/util/cloud.h>
+#include <gpd/grasp_detector.h>
+#include <gpd/sequential_importance_sampling.h>
+
+#include <pcl/common/common.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl_conversions/pcl_conversions.h>
+
 #if __has_include(<tf2_geometry_msgs/tf2_geometry_msgs.hpp>)
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #else
@@ -55,8 +69,11 @@ using GoalHandlePlace = rclcpp_action::ServerGoalHandle<Place>;
 using PickAndPlace = manipulation_interfaces::action::PickAndPlace;
 using GoalHandlePickAndPlace = rclcpp_action::ServerGoalHandle<PickAndPlace>;
 
-using PickFromPC = manipulation_interfaces::action::PickFromPC;
-using GoalHandlePickFromPC = rclcpp_action::ServerGoalHandle<PickFromPC>;
+using PickFromPc = manipulation_interfaces::action::PickFromPc;
+using GoalHandlePickFromPc = rclcpp_action::ServerGoalHandle<PickFromPc>;
+
+using PointCloudRGBA = pcl::PointCloud<pcl::PointXYZRGBA>;
+using PointCloudPointNormal = pcl::PointCloud<pcl::PointNormal>;
 
 moveit::task_constructor::Task move_to_predefined_task(
   std::string group_name,
@@ -120,6 +137,10 @@ moveit::task_constructor::Task detach_object_task(
   moveit_msgs::msg::CollisionObject object,
   rclcpp::Node::SharedPtr node);
 
+moveit::task_constructor::Task pick_from_pc_task(
+  sensor_msgs::msg::PointCloud2 object,
+  rclcpp::Node::SharedPtr node);
+
 bool evaluate_joint(
   const std::map<std::string, double> & desired_joint_values,
   const std::vector<double> & tolerances);
@@ -129,6 +150,9 @@ bool execute_task(
   rclcpp::Node::SharedPtr node);
 
 bool IsGripperClosed(rclcpp::Node::SharedPtr node);
+
+gpd::util::Cloud* process_point_cloud(sensor_msgs::msg::PointCloud2 pc);
+
 
 } // end namespace manipulation
 
