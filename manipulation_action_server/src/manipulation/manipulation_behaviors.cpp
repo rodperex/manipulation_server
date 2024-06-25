@@ -626,7 +626,8 @@ moveit::task_constructor::Task detach_object_task(
 
 moveit::task_constructor::Task pick_from_pc_task(
   sensor_msgs::msg::PointCloud2 object,
-  rclcpp::Node::SharedPtr node)
+  rclcpp::Node::SharedPtr node,
+  std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> interpolation_planner)
 {
   RCLCPP_INFO_STREAM(node->get_logger(), "Executing pick from pc");
 
@@ -648,20 +649,29 @@ moveit::task_constructor::Task pick_from_pc_task(
   node->get_parameter("gripper_open", gripper_max_limits);
 
   gpd::GraspDetector* grasp_detector = new gpd::GraspDetector(config_file);
+  RCLCPP_INFO_STREAM(node->get_logger(), "Grasp detector created");
 
   auto cloud_camera = process_point_cloud(object);
 
   grasp_detector->preprocessPointCloud(*cloud_camera);
 
   auto candidates = grasp_detector->detectGrasps(*cloud_camera);
+  RCLCPP_INFO_STREAM(node->get_logger(), "Grasping candidates detected");
+
 
   auto task = configure_task("pick_from_pc_task", node);
 
-  moveit::task_constructor::Stage * current_state_ptr = nullptr;
-  auto stage_state_current = std::make_unique<moveit::task_constructor::stages::CurrentState>(
-    "current");
-  current_state_ptr = stage_state_current.get();
-  task.add(std::move(stage_state_current));
+  RCLCPP_INFO_STREAM(node->get_logger(), "Task initialized");
+
+
+  {
+    auto stage = std::make_unique<
+      moveit::task_constructor::stages::CurrentState>(
+      "current");
+    task.add(std::move(stage));
+  }
+
+  RCLCPP_INFO_STREAM(node->get_logger(), "Current state added");
 
   auto cartesian = std::make_shared<moveit::task_constructor::solvers::CartesianPath>();
 	cartesian->setJumpThreshold(2.0);
@@ -678,36 +688,61 @@ moveit::task_constructor::Task pick_from_pc_task(
 		return pp;
 	}();
 
+  const auto interpolation = [&node]() {
+    auto pp{std::make_shared<moveit::task_constructor::solvers::JointInterpolationPlanner>()};
+    return pp;
+  }();
+
   auto fallbacks = std::make_unique<moveit::task_constructor::Fallbacks>("posible_solutions");
 
   auto add_to_fallbacks{ [&](auto& solver, auto& name, auto& pose, auto& width) {
-    auto  serial = std::make_unique<moveit::task_constructor::SerialContainer>("move_nd_close");
+    // auto serial = std::make_unique<moveit::task_constructor::SerialContainer>("move_nd_close");
 		auto move_to = std::make_unique<moveit::task_constructor::stages::MoveTo>(name, solver);
-    auto close_gripper = std::make_unique<moveit::task_constructor::stages::MoveTo>("close_gripper", solver);
+    // auto close_gripper = std::make_unique<moveit::task_constructor::stages::MoveTo>("close_gripper", solver);
 
-    close_gripper->setGroup(gripper_group);  
-    close_gripper->setGoal(std::map<std::string, double>{{gripper_joints[0], gripper_min_limits[0]},
-                                                  {gripper_joints[1], width}});
+    // close_gripper->setGroup(gripper_group);  
+    // close_gripper->setGoal(std::map<std::string, double>{{gripper_joints[0], gripper_min_limits[0]},
+                                                  // {gripper_joints[1], width}});
 
 		move_to->setGroup(node->get_parameter("arm_group").as_string());
+
+    // Eigen::Isometry3d grasp_frame_transform;
+    // //TO DO: adapt to object shape
+    // grasp_frame_transform.translation().x() = pose.pose.position.x;
+    // grasp_frame_transform.translation().y() = pose.pose.position.y;
+    // grasp_frame_transform.translation().z() = pose.pose.position.z;
+    // grasp_frame_transform.linear() = Eigen::Quaterniond(pose.pose.orientation.w, pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z).matrix();
+
+    move_to->setIKFrame(node->get_parameter("ik_frame").as_string());
 		move_to->setGoal(pose);
 
-    serial->insert(std::move(move_to));
-    serial->insert(std::move(close_gripper));
+    // serial->insert(std::move(move_to));
+    // RCLCPP_INFO_STREAM(node->get_logger(), "Move to added");
+    // serial->insert(std::move(close_gripper));
+    RCLCPP_INFO_STREAM(node->get_logger(), "Close gripper added");
 
-		fallbacks->add(std::move(serial));
+		fallbacks->add(std::move(move_to));
 	} };
 
+  if (candidates.empty())
+  {
+    RCLCPP_ERROR_STREAM(node->get_logger(), "No grasping candidates found");
+    return task;
+  }
   for (const auto& grasp : candidates)
   {
     geometry_msgs::msg::PoseStamped pose;
     
-
+    // auto grasp = std::move(candidates[0]);
     pose.header.frame_id = object.header.frame_id;
 
     pose.pose.position.x = grasp->getPosition().x();
-    pose.pose.position.y = grasp->getPosition().x();
-    pose.pose.position.z = grasp->getPosition().x();
+    pose.pose.position.y = grasp->getPosition().y();
+    pose.pose.position.z = grasp->getPosition().z();
+
+    //print header frame id
+    RCLCPP_INFO_STREAM(node->get_logger(), "Header frame id: " << pose.header.frame_id);
+    RCLCPP_INFO_STREAM(node->get_logger(), "Grasp position XYZ: " << grasp->getPosition().x() << " " << grasp->getPosition().y() << " " << grasp->getPosition().z());
 
     auto orientation_matrix = grasp->getOrientation();
     Eigen::Quaterniond q(orientation_matrix);
@@ -716,126 +751,92 @@ moveit::task_constructor::Task pick_from_pc_task(
     pose.pose.orientation.y = q.y();
     pose.pose.orientation.z = q.z();
     pose.pose.orientation.w = q.w();
+    RCLCPP_INFO_STREAM(node->get_logger(), "Grasp orientation XYZW: " << q.x() << " " << q.y() << " " << q.z() << " " << q.w());
+    // 0.069, 0.969, -0.229, 0.061
+    // pose.pose.orientation.w = 1.0;
 
     double width = grasp->getGraspWidth();
 
     add_to_fallbacks(cartesian, "Cartesian path", pose, width);
+    add_to_fallbacks(interpolation, "Interpolation path", pose, width);
     add_to_fallbacks(ptp, "PTP path", pose, width);
     add_to_fallbacks(rrtconnect, "RRT path", pose, width);
+    RCLCPP_INFO_STREAM(node->get_logger(), "one candidate added");
   }
 
   task.add(std::move(fallbacks));
+  RCLCPP_INFO_STREAM(node->get_logger(), "Fallbacks added");
 
   return task;
 
+}
 
+std::vector<geometry_msgs::msg::PoseStamped>  generate_grasp_poses(
+  sensor_msgs::msg::PointCloud2 object,
+  rclcpp::Node::SharedPtr node)
+{
+  RCLCPP_INFO_STREAM(node->get_logger(), "Executing generating grasp poses from pc");
 
+  auto poses = std::vector<geometry_msgs::msg::PoseStamped>();
 
+  std::string retreat_axis, config_file, gripper_group, gripper_joint;
+  std::vector<std::string> gripper_joints;
+  std::vector<double> gripper_min_limits, gripper_max_limits;
+  int axis_index;
+  float retreat_min, retreat_max, retreat_resolution;
+  std::vector<std::tuple<float, float, float>> pc_points_xyz;
 
+  // node->get_parameter("pick_from_pc.retreat_axis", retreat_axis);
+  // node->get_parameter("pick_from_pc.retreat_min", retreat_min);
+  // node->get_parameter("pick_from_pc.retreat_max", retreat_max);
+  // node->get_parameter("pick_from_pc.retreat_resolution", retreat_resolution);
+  node->get_parameter("pick_from_pc.config_file", config_file);
+  node->get_parameter("gripper_group", gripper_group);
+  node->get_parameter("gripper_joints", gripper_joints);
+  node->get_parameter("gripper_closed", gripper_min_limits);
+  node->get_parameter("gripper_open", gripper_max_limits);
 
+  gpd::GraspDetector* grasp_detector = new gpd::GraspDetector(config_file);
+  RCLCPP_INFO_STREAM(node->get_logger(), "Grasp detector created");
 
-  // auto result = std::make_shared<PickFromPc::Result>();
+  auto cloud_camera = process_point_cloud(object);
 
-  // auto task = configure_task("pick_from_pc_task", node);
+  grasp_detector->preprocessPointCloud(*cloud_camera);
 
-  // moveit::task_constructor::Stage * current_state_ptr = nullptr;
-  // auto stage_state_current = std::make_unique<moveit::task_constructor::stages::CurrentState>(
-  //   "current");
-  // current_state_ptr = stage_state_current.get();
-  // task.add(std::move(stage_state_current));
+  auto candidates = grasp_detector->detectGrasps(*cloud_camera);
+  RCLCPP_INFO_STREAM(node->get_logger(), "Grasping candidates detected");
 
-  // auto cartesian = std::make_shared<moveit::task_constructor::solvers::CartesianPath>();
-	// cartesian->setJumpThreshold(2.0);
+  if (candidates.empty())
+  {
+    RCLCPP_ERROR_STREAM(node->get_logger(), "No grasping candidates found");
+    return poses;
+  }
+  for (const auto& grasp : candidates)
+  {
+    geometry_msgs::msg::PoseStamped pose;
+    
+    pose.header.frame_id = object.header.frame_id;
 
-  // const auto ptp = [&node]() {
-	// 	auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "pilz_industrial_motion_planner") };
-	// 	pp->setPlannerId("PTP");
-	// 	return pp;
-	// }();
+    pose.pose.position.x = grasp->getPosition().x();
+    pose.pose.position.y = grasp->getPosition().y();
+    pose.pose.position.z = grasp->getPosition().z();
+ 
+    //print header frame id
+    RCLCPP_INFO_STREAM(node->get_logger(), "Header frame id: " << pose.header.frame_id);
+    RCLCPP_INFO_STREAM(node->get_logger(), "Grasp position XYZ: " << grasp->getPosition().x() << " " << grasp->getPosition().y() << " " << grasp->getPosition().z());
 
-  // const auto rrtconnect = [&node]() {
-	// 	auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "ompl") };
-	// 	pp->setPlannerId("RRTConnect");
-	// 	return pp;
-	// }();
+    auto orientation_matrix = grasp->getOrientation();
+    Eigen::Quaterniond q(orientation_matrix);
 
-  // auto fallbacks = std::make_unique<moveit::task_constructor::Fallbacks>("posible_solutions");
-  // auto add_to_fallbacks{ [&](auto& solver, auto& name, auto& pose) {
-	// 	auto move_to = std::make_unique<moveit::task_constructor::stages::MoveTo>(name, solver);
-	// 	move_to->setGroup(node->get_parameter("arm_group").as_string());
-	// 	move_to->setGoal(pose);
-	// 	fallbacks->add(std::move(move_to));
-	// } };
+    pose.pose.orientation.x = q.x();
+    pose.pose.orientation.y = q.y();
+    pose.pose.orientation.z = q.z();
+    pose.pose.orientation.w = q.w();
+    RCLCPP_INFO_STREAM(node->get_logger(), "Grasp orientation XYZW: " << q.x() << " " << q.y() << " " << q.z() << " " << q.w());
 
-  // sensor_msgs::PointCloud2ConstIterator<float> iter_x(object, "x");
-  // sensor_msgs::PointCloud2ConstIterator<float> iter_y(object, "y");
-  // sensor_msgs::PointCloud2ConstIterator<float> iter_z(object, "z");
-
-  // for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z)
-  // {
-  //   pc_points_xyz.emplace_back(*iter_x, *iter_y, *iter_z);
-  // }
-  
-  // if (retreat_axis == "x")
-  // {
-  //   axis_index = 0;
-  // }
-  // else if (retreat_axis == "y")
-  // {
-  //   axis_index = 1;
-  // }
-  // else if (retreat_axis == "z")
-  // {
-  //   axis_index = 2;
-  // }
-  // else
-  // {
-  //   RCLCPP_ERROR_STREAM(node->get_logger(), "Invalid retreat axis");
-  //   return task;
-  // }
-
-  // std::sort(pc_points_xyz.begin(), pc_points_xyz.end(), [axis_index](const std::tuple<float, float, float> &a, const std::tuple<float, float, float> &b) {
-  //   switch (axis_index)
-  //   {
-  //   case 0:
-  //     return std::get<0>(a) < std::get<0>(b);  // Compare x values
-  //   case 1:
-  //     return std::get<1>(a) < std::get<1>(b);  // Compare y values
-  //   case 2: 
-  //     return std::get<2>(a) < std::get<2>(b);  // Compare z values
-  //   }
-  // });
-
-  // for (float min = retreat_min; min < retreat_max; min += retreat_resolution)
-  // {
-  //   geometry_msgs::msg::PoseStamped pose;
-  //   pose.header.frame_id = object.header.frame_id;
-  //   switch (axis_index)
-  //   {
-  //   case 0:
-  //     pose.pose.position.x = std::get<0>(pc_points_xyz[0])- min; 
-  //     pose.pose.position.y = std::get<1>(pc_points_xyz[0]);
-  //     pose.pose.position.z = std::get<2>(pc_points_xyz[0]);
-  //     break;
-  //   case 1:
-  //     pose.pose.position.x = std::get<0>(pc_points_xyz[0]);
-  //     pose.pose.position.y = std::get<1>(pc_points_xyz[0]) - min;
-  //     pose.pose.position.z = std::get<2>(pc_points_xyz[0]);
-  //     break;
-  //   case 2:
-  //     pose.pose.position.x = std::get<0>(pc_points_xyz[0]);
-  //     pose.pose.position.y = std::get<1>(pc_points_xyz[0]);
-  //     pose.pose.position.z = std::get<2>(pc_points_xyz[0]) - min;
-  //     break;
-  //   }
-  //   add_to_fallbacks(cartesian, "Cartesian path", pose);
-  //   add_to_fallbacks(ptp, "PTP path", pose);
-  //   add_to_fallbacks(rrtconnect, "RRT path", pose);
-  // }
-
-  // task.add(std::move(fallbacks));
-
-  // return task;
+    poses.push_back(pose);
+  }
+  return poses;
 }
 
 

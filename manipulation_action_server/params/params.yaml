@@ -17,7 +17,7 @@ manipulation_action_server_executor:
       retreat_min: 0.05 # middle of the gripper
       retreat_max: 0.1  # end of the gripper
       retreat_resolution: 0.01 # distance to st
-      config_file: "config/pick_from_pc.yaml"
+      config_file: "/home/juan/workspaces/robocup/src/manipulation_server/manipulation_action_server/params/ros_vino_params.cfg"
      
 
     

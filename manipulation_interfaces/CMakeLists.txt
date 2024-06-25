@@ -23,6 +23,7 @@ set(action_msgs
     action/PickAndPlace.action
     action/MoveEndEffector.action
     action/PickFromPc.action
+    action/GenerateGraspPoses.action
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}

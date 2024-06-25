@@ -94,6 +94,16 @@ ManipulationServer::on_configure(const rclcpp_lifecycle::State & state)
     std::bind(&ManipulationServer::handle_pick_from_pc_accepted, this, std::placeholders::_1)
   );
 
+  action_server_generate_grasp_poses_ = rclcpp_action::create_server<GenerateGraspPoses>(
+    this,
+    "generate_grasp_poses",
+    std::bind(
+      &ManipulationServer::handle_generate_grasp_poses_goal, this, std::placeholders::_1,
+      std::placeholders::_2),
+    std::bind(&ManipulationServer::handle_generate_grasp_poses_cancel, this, std::placeholders::_1),
+    std::bind(&ManipulationServer::execute_generate_grasp_poses, this, std::placeholders::_1)
+  );
+
   planning_interface_ = std::make_shared<moveit::planning_interface::PlanningSceneInterface>();
 
   interpolation_planner_ =
@@ -236,6 +246,17 @@ ManipulationServer::handle_pick_from_pc_goal(
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
+rclcpp_action::GoalResponse
+ManipulationServer::handle_generate_grasp_poses_goal(
+  const rclcpp_action::GoalUUID & uuid,
+  std::shared_ptr<const manipulation_interfaces::action::GenerateGraspPoses::Goal> goal)
+{
+
+  RCLCPP_INFO(this->get_logger(), "Received goal: generate_grasp_poses");
+  (void)uuid;
+  return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+}
+
 rclcpp_action::CancelResponse
 ManipulationServer::handle_move_to_predefined_cancel(
   const std::shared_ptr<rclcpp_action::ServerGoalHandle<manipulation_interfaces::action::MoveToPredefined>> goal_handle)
@@ -299,6 +320,16 @@ ManipulationServer::handle_pick_from_pc_cancel(
   <rclcpp_action::ServerGoalHandle<manipulation_interfaces::action::PickFromPc>> goal_handle)
 {
   RCLCPP_INFO(this->get_logger(), "Canceling goal: pick_from_pc");
+  (void)goal_handle;
+  return rclcpp_action::CancelResponse::ACCEPT;
+}
+
+rclcpp_action::CancelResponse
+ManipulationServer::handle_generate_grasp_poses_cancel(
+  const std::shared_ptr
+  <rclcpp_action::ServerGoalHandle<manipulation_interfaces::action::GenerateGraspPoses>> goal_handle)
+{
+  RCLCPP_INFO(this->get_logger(), "Canceling goal: generate_grasp_poses");
   (void)goal_handle;
   return rclcpp_action::CancelResponse::ACCEPT;
 }
@@ -650,7 +681,8 @@ ManipulationServer::execute_pick_from_pc(
 
   task_ = pick_from_pc_task(
     goal->object_goal,
-    node_);
+    node_,
+    interpolation_planner_);
 
   if (execute_task(task_, node_)) {
     RCLCPP_INFO(get_logger(), "Goal (pick_from_pc) succeeded");
@@ -661,6 +693,29 @@ ManipulationServer::execute_pick_from_pc(
   }
   task_.clear();
   goal_handle->succeed(result); 
+}
+
+void ManipulationServer::execute_generate_grasp_poses(
+  const std::shared_ptr<GoalHandleGenerateGraspPoses> goal_handle)
+{
+  RCLCPP_INFO(
+    this->get_logger(), "Executing goal (generate_grasp_poses)");
+
+  auto goal = goal_handle->get_goal();
+  auto result = std::make_shared<GenerateGraspPoses::Result>();
+
+  auto grasp_poses = generate_grasp_poses(goal->object_goal, node_);
+
+  if (grasp_poses.empty()) {
+    RCLCPP_INFO(get_logger(), "Goal (generate_grasp_poses) failed");
+    result->success = false;
+  } else {
+    RCLCPP_INFO(get_logger(), "Goal (generate_grasp_poses) succeeded");
+    result->success = true;
+  }
+
+  result->poses = grasp_poses;
+  goal_handle->succeed(result);
 }
 
 

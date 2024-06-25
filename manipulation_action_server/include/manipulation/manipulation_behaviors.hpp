@@ -26,6 +26,7 @@
 #include "manipulation_interfaces/action/place.hpp"
 #include "manipulation_interfaces/action/pick_and_place.hpp"
 #include "manipulation_interfaces/action/pick_from_pc.hpp"
+#include "manipulation_interfaces/action/generate_grasp_poses.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <gpd/util/cloud.h>
@@ -71,6 +72,9 @@ using GoalHandlePickAndPlace = rclcpp_action::ServerGoalHandle<PickAndPlace>;
 
 using PickFromPc = manipulation_interfaces::action::PickFromPc;
 using GoalHandlePickFromPc = rclcpp_action::ServerGoalHandle<PickFromPc>;
+
+using GenerateGraspPoses = manipulation_interfaces::action::GenerateGraspPoses;
+using GoalHandleGenerateGraspPoses = rclcpp_action::ServerGoalHandle<GenerateGraspPoses>;
 
 using PointCloudRGBA = pcl::PointCloud<pcl::PointXYZRGBA>;
 using PointCloudPointNormal = pcl::PointCloud<pcl::PointNormal>;
@@ -138,6 +142,12 @@ moveit::task_constructor::Task detach_object_task(
   rclcpp::Node::SharedPtr node);
 
 moveit::task_constructor::Task pick_from_pc_task(
+  sensor_msgs::msg::PointCloud2 object,
+  rclcpp::Node::SharedPtr node,
+  std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner>
+    interpolation_planner);
+
+std::vector<geometry_msgs::msg::PoseStamped> generate_grasp_poses(
   sensor_msgs::msg::PointCloud2 object,
   rclcpp::Node::SharedPtr node);
 

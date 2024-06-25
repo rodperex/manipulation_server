@@ -31,7 +31,7 @@ include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
-# find_package(backward_ros REQUIRED)
+find_package(backward_ros REQUIRED)
 
 
 set(dependencies
@@ -47,6 +47,7 @@ set(dependencies
     pcl_conversions
     PCL
     OpenCV
+    backward_ros
 )
 
 include_directories(

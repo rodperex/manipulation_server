@@ -1,0 +1,11 @@
+# Request
+sensor_msgs/PointCloud2 object_goal
+
+# Is it better to use only the tf and then extract the collision from the tf ?
+---
+# Result
+geometry_msgs/PoseStamped[] poses
+bool success
+---
+# Feedback
+string msg
