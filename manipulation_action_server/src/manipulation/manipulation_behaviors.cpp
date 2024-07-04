@@ -70,10 +70,12 @@ moveit::task_constructor::Task move_to_predefined_task(
 
   auto task = configure_task("move_to_predefined_task", node);
 
-  auto stage_state_current = std::make_unique<
-    moveit::task_constructor::stages::CurrentState>(
-    "current");
-  task.add(std::move(stage_state_current));
+  {
+    auto stage = std::make_unique<
+      moveit::task_constructor::stages::CurrentState>(
+      "current");
+    task.add(std::move(stage));
+  }
 
   auto stage_move_to_predefined =
     std::make_unique<moveit::task_constructor::stages::MoveTo>(
@@ -155,6 +157,7 @@ moveit::task_constructor::Task move_end_effector_task(
   auto fallbacks = std::make_unique<moveit::task_constructor::Fallbacks>("posible_solutions");
   auto add_to_fallbacks{ [&](auto& solver, auto& name) {
 		auto move_to = std::make_unique<moveit::task_constructor::stages::MoveTo>(name, solver);
+    move_to->setIKFrame(node->get_parameter("ik_frame").as_string());
 		move_to->setGroup(node->get_parameter("arm_group").as_string());
 		move_to->setGoal(pose);
 		fallbacks->add(std::move(move_to));
@@ -664,17 +667,17 @@ moveit::task_constructor::Task pick_from_pc_task(
   RCLCPP_INFO_STREAM(node->get_logger(), "Task initialized");
 
 
-  {
-    auto stage = std::make_unique<
-      moveit::task_constructor::stages::CurrentState>(
-      "current");
-    task.add(std::move(stage));
-  }
+  // {
+  //   auto stage = std::make_unique<
+  //     moveit::task_constructor::stages::CurrentState>(
+  //     "current");
+  //   task.add(std::move(stage));
+  // }
 
   RCLCPP_INFO_STREAM(node->get_logger(), "Current state added");
 
-  auto cartesian = std::make_shared<moveit::task_constructor::solvers::CartesianPath>();
-	cartesian->setJumpThreshold(2.0);
+  auto cartesian_planner = std::make_shared<moveit::task_constructor::solvers::CartesianPath>();
+	cartesian_planner->setJumpThreshold(2.0);
 
   const auto ptp = [&node]() {
 		auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "pilz_industrial_motion_planner") };
@@ -729,43 +732,225 @@ moveit::task_constructor::Task pick_from_pc_task(
     RCLCPP_ERROR_STREAM(node->get_logger(), "No grasping candidates found");
     return task;
   }
-  for (const auto& grasp : candidates)
-  {
-    geometry_msgs::msg::PoseStamped pose;
+  // for (const auto& grasp : candidates)
+  // {
+  //   geometry_msgs::msg::PoseStamped pose;
     
-    // auto grasp = std::move(candidates[0]);
-    pose.header.frame_id = object.header.frame_id;
+  //   // auto grasp = std::move(candidates[0]);
+  //   pose.header.frame_id = object.header.frame_id;
 
-    pose.pose.position.x = grasp->getPosition().x();
-    pose.pose.position.y = grasp->getPosition().y();
-    pose.pose.position.z = grasp->getPosition().z();
+  //   pose.pose.position.x = grasp->getPosition().x();
+  //   pose.pose.position.y = grasp->getPosition().y();
+  //   pose.pose.position.z = grasp->getPosition().z();
 
-    //print header frame id
-    RCLCPP_INFO_STREAM(node->get_logger(), "Header frame id: " << pose.header.frame_id);
-    RCLCPP_INFO_STREAM(node->get_logger(), "Grasp position XYZ: " << grasp->getPosition().x() << " " << grasp->getPosition().y() << " " << grasp->getPosition().z());
+  //   //print header frame id
+  //   RCLCPP_INFO_STREAM(node->get_logger(), "Header frame id: " << pose.header.frame_id);
+  //   RCLCPP_INFO_STREAM(node->get_logger(), "Grasp position XYZ: " << grasp->getPosition().x() << " " << grasp->getPosition().y() << " " << grasp->getPosition().z());
 
-    auto orientation_matrix = grasp->getOrientation();
-    Eigen::Quaterniond q(orientation_matrix);
+  //   auto orientation_matrix = grasp->getOrientation();
+  //   Eigen::Quaterniond q(orientation_matrix);
 
-    pose.pose.orientation.x = q.x();
-    pose.pose.orientation.y = q.y();
-    pose.pose.orientation.z = q.z();
-    pose.pose.orientation.w = q.w();
-    RCLCPP_INFO_STREAM(node->get_logger(), "Grasp orientation XYZW: " << q.x() << " " << q.y() << " " << q.z() << " " << q.w());
-    // 0.069, 0.969, -0.229, 0.061
-    // pose.pose.orientation.w = 1.0;
+  //   pose.pose.orientation.x = q.x();
+  //   pose.pose.orientation.y = q.y();
+  //   pose.pose.orientation.z = q.z();
+  //   pose.pose.orientation.w = q.w();
+  //   RCLCPP_INFO_STREAM(node->get_logger(), "Grasp orientation XYZW: " << q.x() << " " << q.y() << " " << q.z() << " " << q.w());
+  //   // 0.069, 0.969, -0.229, 0.061
+  //   // pose.pose.orientation.w = 1.0;
 
-    double width = grasp->getGraspWidth();
+  //   double width = grasp->getGraspWidth();
 
-    add_to_fallbacks(cartesian, "Cartesian path", pose, width);
-    add_to_fallbacks(interpolation, "Interpolation path", pose, width);
-    add_to_fallbacks(ptp, "PTP path", pose, width);
-    add_to_fallbacks(rrtconnect, "RRT path", pose, width);
-    RCLCPP_INFO_STREAM(node->get_logger(), "one candidate added");
+  //   add_to_fallbacks(cartesian, "Cartesian path", pose, width);
+  //   add_to_fallbacks(interpolation, "Interpolation path", pose, width);
+  //   add_to_fallbacks(ptp, "PTP path", pose, width);
+  //   add_to_fallbacks(rrtconnect, "RRT path", pose, width);
+  //   RCLCPP_INFO_STREAM(node->get_logger(), "one candidate added");
+  // }
+
+  // task.add(std::move(fallbacks));
+  // RCLCPP_INFO_STREAM(node->get_logger(), "Fallbacks added");
+
+  // return task;
+
+
+ ///// COMPLETE PICK TASK :
+
+  RCLCPP_INFO_STREAM(node->get_logger(), "Executing pick");
+  // psi->applyCollisionObject(object);
+
+  moveit::task_constructor::Stage * current_state_ptr = nullptr;
+  auto stage_state_current = std::make_unique<moveit::task_constructor::stages::CurrentState>(
+    "current");
+  current_state_ptr = stage_state_current.get();
+  task.add(std::move(stage_state_current));
+
+  std::string arm_group =
+    node->get_parameter("arm_group").as_string();
+  // std::string gripper_group =
+  //   node->get_parameter("gripper_group").as_string();
+  std::string open_pose =
+    node->get_parameter("open_pose").as_string();
+  std::string close_pose =
+    node->get_parameter("close_pose").as_string();
+
+  // 1. Open gripper
+  RCLCPP_INFO(node->get_logger(), "1.- Open gripper");
+  auto stage_open_gripper =
+    std::make_unique<moveit::task_constructor::stages::MoveTo>(
+    "open_gripper",
+    interpolation_planner);
+
+  stage_open_gripper->setGroup(gripper_group);
+  stage_open_gripper->setGoal(open_pose);
+  task.add(std::move(stage_open_gripper));
+
+
+  // 2. Move to pick
+  RCLCPP_INFO(node->get_logger(), "2.- Move to pick");
+  auto stage_move_to_pick = std::make_unique<moveit::task_constructor::stages::Connect>(
+    "move_to_pick",
+    moveit::task_constructor::stages::Connect::GroupPlannerVector{
+      {arm_group, interpolation_planner}
+    });
+
+  stage_move_to_pick->setTimeout(3.0);
+  stage_move_to_pick->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT);
+  stage_move_to_pick->setMaxDistance(0.1);
+  task.add(std::move(stage_move_to_pick));
+  RCLCPP_INFO(node->get_logger(), "Move to pick stage added");
+
+  // 3. Pick object
+  RCLCPP_INFO(node->get_logger(), "3.- Pick object");
+  {
+    auto grasp = std::make_unique<moveit::task_constructor::SerialContainer>("pick_object");
+    task.properties().exposeTo(grasp->properties(), {"eef", "group", "ik_frame"});
+    // clang-format off
+    grasp->properties().configureInitFrom(
+      moveit::task_constructor::Stage::PARENT,
+      {"eef", "group", "ik_frame"});
+
+    {
+      // 3.1. Approach object
+      RCLCPP_INFO(node->get_logger(), "\t3.1.- Approach object");
+      auto stage =
+        std::make_unique<moveit::task_constructor::stages::MoveRelative>(
+        "approach_object",
+        cartesian_planner);
+
+      stage->properties().set("marker_ns", "approach_object");
+      stage->properties().set("link", node->get_parameter("ik_frame"));
+      stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, {"group"});
+      stage->setMinMaxDistance(0.0, 0.15);
+
+      // Set hand forward direction
+      geometry_msgs::msg::Vector3Stamped vec;
+      vec.header.frame_id = (node->get_parameter("ik_frame")).as_string();
+      vec.vector.x = 1.0;
+      stage->setDirection(vec);
+      grasp->insert(std::move(stage));
+    }
+    {
+      // 3.2. Generate grasp pose
+      RCLCPP_INFO(node->get_logger(), "\t3.2.- Generate grasp pose");
+
+      auto grasp_poses = std::make_unique<moveit::task_constructor::Alternatives>("grasp_poses");
+      task.properties().exposeTo(grasp_poses->properties(), {"eef", "group", "ik_frame"});
+      grasp_poses->properties().configureInitFrom(
+        moveit::task_constructor::Stage::PARENT,
+        {"eef", "group", "ik_frame"});    
+
+      {
+
+        for (const auto& grasp : candidates)
+        {
+          geometry_msgs::msg::PoseStamped pose;
+          auto stage = std::make_unique<moveit::task_constructor::stages::GeneratePose>(
+          "generate_grasp_pose");
+           stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT);
+          stage->properties().set("marker_ns", "grasp_pose");
+          // stage->setPreGraspPose(open_pose);
+          // stage->setObject(object.id);
+          // stage->setAngleDelta(M_PI / 3);
+          stage->setMonitoredStage(current_state_ptr);  
+
+          
+          // auto grasp = std::move(candidates[0]);
+          pose.header.frame_id = object.header.frame_id;
+
+          pose.pose.position.x = grasp->getPosition().x();
+          pose.pose.position.y = grasp->getPosition().y();
+          pose.pose.position.z = grasp->getPosition().z();
+
+          //print header frame id
+          RCLCPP_INFO_STREAM(node->get_logger(), "Header frame id: " << pose.header.frame_id);
+          RCLCPP_INFO_STREAM(node->get_logger(), "Grasp position XYZ: " << grasp->getPosition().x() << " " << grasp->getPosition().y() << " " << grasp->getPosition().z());
+
+          auto orientation_matrix = grasp->getOrientation();
+          Eigen::Quaterniond q(orientation_matrix);
+
+          pose.pose.orientation.x = q.x();
+          pose.pose.orientation.y = q.y();
+          pose.pose.orientation.z = q.z();
+          pose.pose.orientation.w = q.w();
+          RCLCPP_INFO_STREAM(node->get_logger(), "Grasp orientation XYZW: " << q.x() << " " << q.y() << " " << q.z() << " " << q.w());
+
+          stage->setPose(pose);
+          
+          // Compute IK
+          auto wrapper =
+            std::make_unique<moveit::task_constructor::stages::ComputeIK>(
+            "grasp_pose_IK",
+            std::move(stage));
+          wrapper->setMaxIKSolutions(8); // param?
+          wrapper->setMinSolutionDistance(1.0); // param?
+          wrapper->setIKFrame((node->get_parameter("ik_frame")).as_string());
+          wrapper->properties().configureInitFrom(
+            moveit::task_constructor::Stage::PARENT, {"eef",
+              "group"});
+          wrapper->properties().configureInitFrom(
+            moveit::task_constructor::Stage::INTERFACE,
+            {"target_pose"});
+          grasp_poses->insert(std::move(wrapper));
+  
+        }
+
+      }
+      grasp->insert(std::move(grasp_poses));
+    }
+
+    {
+      // 3.3. Close gripper
+      RCLCPP_INFO(node->get_logger(), "\t3.3.- Close gripper");
+      auto stage = std::make_unique<moveit::task_constructor::stages::MoveTo>(
+        "close_hand",
+        interpolation_planner);
+      stage->setGroup(node->get_parameter("eef").as_string());
+      stage->setGoal(close_pose);
+      grasp->insert(std::move(stage));
+    }
+
+    {
+      // 3.6. Lift object
+      RCLCPP_INFO(node->get_logger(), "\t3.6.- Lift object");
+      auto stage =
+        std::make_unique<moveit::task_constructor::stages::MoveRelative>(
+        "lift_object",
+        cartesian_planner);
+      stage->properties().configureInitFrom(moveit::task_constructor::Stage::PARENT, {"group"});
+      stage->setMinMaxDistance(0.0, 0.3);
+      stage->setIKFrame(node->get_parameter("ik_frame").as_string());
+      stage->properties().set("marker_ns", "lift_object");
+
+      // Set upward direction
+      geometry_msgs::msg::Vector3Stamped vec;
+      vec.header.frame_id = "base_link";
+      vec.vector.z = 0.9;
+      stage->setDirection(vec);
+      grasp->insert(std::move(stage));
+    }
+    RCLCPP_INFO(node->get_logger(), "pick added");
+    task.add(std::move(grasp));
   }
-
-  task.add(std::move(fallbacks));
-  RCLCPP_INFO_STREAM(node->get_logger(), "Fallbacks added");
 
   return task;
 
