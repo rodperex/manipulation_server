@@ -1,5 +1,9 @@
 repositories:
-  moveit_task_constructor:
+  thirdparty/moveit_task_constructor:
     type: git
     url: git@github.com:ros-planning/moveit_task_constructor.git
-    version: ros2
+    version: humble
+  thirdparty/gpd:
+    type: git
+    url: https://github.com/atenpas/gpd.git
+    version: master
