@@ -136,14 +136,12 @@ moveit::task_constructor::Task move_end_effector_task(
 	cartesian->setJumpThreshold(2.0);
 
   const auto ptp = [&node]() {
-		auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "pilz_industrial_motion_planner") };
-		pp->setPlannerId("PTP");
+		auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "pilz_industrial_motion_planner", "PTP") };
 		return pp;
 	}();
 
   const auto rrtconnect = [&node]() {
-		auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "ompl") };
-		pp->setPlannerId("RRTConnect");
+		auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "ompl", "RRTConnect") };
 		return pp;
 	}();
 
@@ -680,14 +678,12 @@ moveit::task_constructor::Task pick_from_pc_task(
 	cartesian_planner->setJumpThreshold(2.0);
 
   const auto ptp = [&node]() {
-		auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "pilz_industrial_motion_planner") };
-		pp->setPlannerId("PTP");
+		auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "pilz_industrial_motion_planner", "PTP") };
 		return pp;
 	}();
 
   const auto rrtconnect = [&node]() {
-		auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "ompl") };
-		pp->setPlannerId("RRTConnect");
+		auto pp{ std::make_shared<moveit::task_constructor::solvers::PipelinePlanner>(node, "ompl", "RRTConnect") };
 		return pp;
 	}();
 
